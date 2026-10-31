@@ -89,7 +89,7 @@ Il proxy non inoltra `ADMIN_KEY` all'upstream. Le risposte HTML eliminano CSP/en
 
 `CloudStateStore` accetta soltanto campi pubblici noti, normalizza numeri/URL/mint, incrementa `revision` e scrive JSON con rename atomico. `CloudConfigClient` invia la password solo come Bearer; `BroadcastUI` elimina `adminKey` dal FormData prima di chiamare l'Orchestrator. In modalità cloud l'Orchestrator non salva la configurazione admin in `localStorage`, applica una revisione una sola volta e chiude SSE in `destroy()`.
 
-`STATE_FILE` deve risiedere su un volume persistente in Render/Railway. Lo streamer richiede `STREAM_RTMP_URL`; FFmpeg ritenta ogni 5 secondi, mentre la terminazione di server/launcher arresta il container per consentire il restart esterno. Nessun deploy o stream pubblico è incluso nella verifica locale.
+`STATE_FILE` deve risiedere su un volume persistente in Render/Railway. Su Vercel, `api/index.mjs` esporta lo stesso `http.Server` con `stateFile:null` e `vercel.json` instrada tutto alla Function: non esiste persistenza o coordinamento CA/SSE fra istanze senza uno storage esterno. Il piano Vercel non esegue lo streamer Chromium/FFmpeg. Lo streamer richiede `STREAM_RTMP_URL`; FFmpeg ritenta ogni 5 secondi, mentre la terminazione di server/launcher arresta il container per consentire il restart esterno. Nessun deploy o stream pubblico è incluso nella verifica locale.
 
 ## Input
 

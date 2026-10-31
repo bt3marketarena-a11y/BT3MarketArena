@@ -66,6 +66,12 @@ Per il rendering 3D è necessario un browser con WebGL2 accelerato. Il percorso 
 
 Il pannello F2 della web app usa lo stesso endpoint: prima salva lo stato sul server, poi riconnette il feed dal risultato. Tutti gli altri browser ricevono la nuova revisione via SSE e riconnettono il proprio `MarketFeed` senza ricaricare il gioco. `ADMIN_KEY` non viene inclusa nello stato, nel markup, nei log, nel `localStorage` o nel payload JSON; resta soltanto nell'header della richiesta. Se la variabile non è configurata, ogni mutazione è rifiutata.
 
+### Deploy su Vercel
+
+Il repository include `api/index.mjs`, che esporta lo stesso `http.Server` del proxy come Function Node.js, e `vercel.json`, che instrada ogni richiesta verso `/api/index.mjs`. Importa la repository GitHub in Vercel con framework **Other** e configura `ADMIN_KEY`; `UPSTREAM_ORIGIN` è opzionale. Non serve uno Start Command e non impostare `STATE_FILE`.
+
+Su Vercel il filesystem e la memoria sono effimeri e le richieste possono raggiungere istanze differenti: lo stato CA e gli aggiornamenti SSE sono quindi limitati alla singola istanza e possono essere persi a restart/redeploy. Per sincronizzazione globale affidabile serve uno storage/pub-sub esterno; in alternativa usa Render/Railway con volume. Vercel ospita soltanto la web app, non il container Chromium/FFmpeg 24/7.
+
 ### Deploy su Render
 
 Crea un **Web Service** Node con:
