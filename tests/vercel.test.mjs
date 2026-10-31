@@ -63,7 +63,10 @@ test('Vercel forza il routing statico e conserva soltanto la Function state', as
     rewrites: [
       { source: '/api/(.*)', destination: '/api/$1' },
       { source: '/admin', destination: '/admin.html' },
-      { source: '/(.*)', destination: '/index.html' },
+      {
+        source: '/:path((?!$|api(?:/|$)|admin(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$).*)',
+        destination: 'https://dragonballbt3.online/:path',
+      },
     ],
   });
   assert.equal(existsSync(new URL('../api/state.mjs', import.meta.url)), true);
