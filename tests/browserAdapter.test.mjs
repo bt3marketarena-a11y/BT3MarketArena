@@ -87,6 +87,18 @@ test("l'adapter espone la stessa interfaccia page usata dal menu driver", async 
   assert.equal(typeof (await adapter.screenshot()).width, 'number');
 });
 
+test('la prima cattura attende la creazione del canvas Emscripten', async () => {
+  const { targetWindow, gameCanvas } = fakeWindow();
+  let canvases = [];
+  targetWindow.document.querySelectorAll = () => canvases;
+  const adapter = createBrowserPageAdapter({ window: targetWindow });
+  const pending = adapter.screenshot();
+  setTimeout(() => { canvases = [gameCanvas]; }, 25);
+  const frame = await pending;
+  assert.equal(frame.width, 960);
+  assert.deepEqual([...frame.data.slice(0, 4)], [10, 20, 30, 255]);
+});
+
 test('il contesto WebGL conserva il buffer per la lettura HP post-match', async () => {
   const { installPreserveDrawingBuffer } = await import('../browserPageAdapter.js');
   const calls = [];

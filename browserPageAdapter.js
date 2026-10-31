@@ -120,7 +120,14 @@ export function createBrowserPageAdapter({ window: targetWindow = window } = {})
       up: (key) => dispatchMenuKey(targetWindow, key, false),
     },
     evaluate: (fn, arg) => fn(arg),
-    screenshot: async () => frames.read(),
+    screenshot: async () => {
+      const deadline = Date.now() + 60_000;
+      while (!largestGameCanvas(targetWindow)) {
+        if (Date.now() >= deadline) throw new Error('Canvas WebGL non disponibile entro 60 secondi.');
+        await new Promise((resolve) => targetWindow.setTimeout(resolve, 100));
+      }
+      return frames.read();
+    },
     isClosed: () => false,
   };
 }
