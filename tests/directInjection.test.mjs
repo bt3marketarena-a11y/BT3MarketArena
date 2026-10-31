@@ -42,10 +42,11 @@ test('il monitor condiviso instrada il post-match verso Character Select', async
   const driver = await read('menuDriver.mjs');
   assert.match(monitor, /runRematchSequence/);
   assert.match(monitor, /phase\s*!==\s*'postmatch'/);
-  assert.match(driver, /Character Select, non Rematch/);
-  assert.match(driver, /await waitForResultsMenu\(page\)/);
-  assert.match(driver, /await tap\('ArrowDown', 400\)/);
-  assert.match(driver, /await padTap\('down', 400\)/);
+  assert.match(driver, /a Character Select/);
+  assert.match(driver, /await waitForResultsMenu\(page, \{ menuPlayer \}\)/);
+  assert.match(driver, /await tap\(key, 120\)/);
+  assert.match(driver, /await padTap\(direction, 120\)/);
+  assert.match(driver, /readResultsMenuSelection/);
   assert.match(driver, /return rosterSequence\(page, options\)/);
 });
 

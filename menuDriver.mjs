@@ -85,12 +85,10 @@ export function hasActiveCombatFrame(png) {
   return timerPixels > 10;
 }
 
-export function hasPauseMenuFrame(png) {
+function pausePanelStats(png) {
   let samples = 0;
   let dark = 0;
   let brightText = 0;
-  // Il menu 1P/2P Pause copre il centro con un pannello blu scuro e voci bianche.
-  // La combinazione evita di classificare come pausa un'arena notturna o una nuvola.
   for (let y = Math.floor(png.height * 0.32); y < Math.ceil(png.height * 0.68); y += 4) {
     for (let x = Math.floor(png.width * 0.18); x < Math.ceil(png.width * 0.82); x += 4) {
       const offset = (y * png.width + x) * 4;
@@ -104,16 +102,85 @@ export function hasPauseMenuFrame(png) {
       samples += 1;
     }
   }
-  return samples > 0 && dark / samples > 0.45 && brightText > 24;
+  return { darkRatio: samples ? dark / samples : 0, brightText };
 }
 
-export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 500 } = {}) {
+function darkPanelRatio(png, minX, maxX, minY = 0.4, maxY = 0.6) {
+  let samples = 0;
+  let dark = 0;
+  for (let y = Math.floor(png.height * minY); y < Math.ceil(png.height * maxY); y += 3) {
+    for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 3) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blue = png.data[offset + 2];
+      if (Math.max(red, green, blue) < 105 && blue >= red) dark += 1;
+      samples += 1;
+    }
+  }
+  return samples ? dark / samples : 0;
+}
+
+export function hasPauseMenuFrame(png) {
+  const { darkRatio, brightText } = pausePanelStats(png);
+  // Il menu 1P/2P Pause copre il centro con un pannello blu scuro e voci bianche.
+  // La combinazione evita di classificare come pausa un'arena notturna o una nuvola.
+  return darkRatio > 0.45 && brightText > 24;
+}
+
+export function hasResultsMenuFrame(png) {
+  const { darkRatio, brightText } = pausePanelStats(png);
+  // Il menu risultati è largo; EXIT? è stretto e lascia scoperte queste fasce.
+  const left = darkPanelRatio(png, 0.18, 0.28);
+  const right = darkPanelRatio(png, 0.72, 0.82);
+  return darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35;
+}
+
+export function hasExitPromptFrame(png) {
+  const { darkRatio, brightText } = pausePanelStats(png);
+  const center = darkPanelRatio(png, 0.3, 0.7, 0.34, 0.65);
+  const left = darkPanelRatio(png, 0.18, 0.28);
+  const right = darkPanelRatio(png, 0.72, 0.82);
+  return darkRatio > 0.2 && brightText > 24 && center > 0.4 && left < 0.15 && right < 0.15;
+}
+
+export function readResultsMenuSelection(png) {
+  if (!hasResultsMenuFrame(png)) return null;
+  const centers = [225, 252, 284, 311, 342, 371];
+  const counts = centers.map((center) => {
+    const scaledCenter = center * png.height / 540;
+    let yellow = 0;
+    for (let y = Math.floor(scaledCenter - 9 * png.height / 540); y <= Math.ceil(scaledCenter + 9 * png.height / 540); y += 2) {
+      for (let x = Math.floor(png.width * 0.2); x < Math.ceil(png.width * 0.8); x += 3) {
+        const offset = (y * png.width + x) * 4;
+        const red = png.data[offset];
+        const green = png.data[offset + 1];
+        const blue = png.data[offset + 2];
+        if (red > 140 && green > 100 && blue < 120 && red > blue * 1.6 && green > blue * 1.3) yellow += 1;
+      }
+    }
+    return yellow;
+  });
+  const selected = counts.indexOf(Math.max(...counts));
+  return counts[selected] > 20 ? selected : null;
+}
+
+export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 500, menuPlayer = 1 } = {}) {
+  const { tap, padTap } = createMenuControls(page, () => {});
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const png = PNG.sync.read(await page.screenshot());
-    if (hasPauseMenuFrame(png)) {
-      console.log('[BT3 menu] menu dei risultati visibile: selezione Character Select abilitata');
-      return;
+    if (hasExitPromptFrame(png)) {
+      console.log('[BT3 menu] EXIT? rilevato: confermo No e torno al menu dei risultati');
+      if (menuPlayer === 0) await tap('k', 300);
+      else await padTap('cross', 300);
+      await wait(page, 1_000);
+      continue;
+    }
+    const selected = readResultsMenuSelection(png);
+    if (selected !== null) {
+      console.log(`[BT3 menu] menu dei risultati visibile: voce ${selected + 1} evidenziata`);
+      return selected;
     }
     await wait(page, pollMs);
   }
@@ -300,7 +367,7 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
   return plan;
 }
 
-/** Dopo KO/timeout evita Rematch: seconda voce = Character Select. */
+/** Dopo KO/timeout naviga dalla voce realmente evidenziata a Character Select. */
 export async function runRematchSequence(page, options = {}) {
   const { tap, padTap, progress } = createMenuControls(page, options.onProgress ?? (() => {}));
   const menuPlayer = options.menuPlayer === 0 ? 0 : 1;
@@ -311,17 +378,24 @@ export async function runRematchSequence(page, options = {}) {
     document.querySelector('canvas')?.focus();
   });
   progress('attesa visiva del menu dei risultati; nessuna conferma anticipata');
-  await waitForResultsMenu(page);
-  progress(`post-match P${menuPlayer + 1}: Character Select, non Rematch`);
-  if (menuPlayer === 0) {
-    await tap('ArrowDown', 400);
-    await wait(page, 1_200);
-    await tap('k', 400);
-  } else {
-    await padTap('down', 400);
-    await wait(page, 1_200);
-    await padTap('cross', 400);
+  const selected = await waitForResultsMenu(page, { menuPlayer });
+  const delta = selected - 1;
+  const direction = delta > 0 ? 'up' : 'down';
+  const key = delta > 0 ? 'ArrowUp' : 'ArrowDown';
+  progress(`post-match P${menuPlayer + 1}: dalla voce ${selected + 1} a Character Select`);
+  for (let index = 0; index < Math.abs(delta); index += 1) {
+    // Sotto la soglia di auto-repeat: una pressione deve spostare una sola riga.
+    if (menuPlayer === 0) await tap(key, 120);
+    else await padTap(direction, 120);
+    await wait(page, 350);
   }
+  await wait(page, 800);
+  const verified = readResultsMenuSelection(PNG.sync.read(await page.screenshot()));
+  if (verified !== 1) {
+    throw new Error(`Character Select non verificato visivamente (voce ${verified === null ? 'ignota' : verified + 1}); conferma bloccata.`);
+  }
+  if (menuPlayer === 0) await tap('k', 400);
+  else await padTap('cross', 400);
   await wait(page, 8_000);
   return rosterSequence(page, options);
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import { waitForResultsMenu } from '../menuDriver.mjs';
 
-function menuFrame(withMenu) {
+function menuFrame(withMenu, selected = 0) {
   const png = new PNG({ width: 960, height: 540 });
   for (let index = 0; index < png.data.length; index += 4) {
     png.data[index] = 35;
@@ -21,12 +21,23 @@ function menuFrame(withMenu) {
     }
   }
   // Testo tenue: il menu dei risultati reale è meno luminoso della pausa.
-  for (let y = 225; y < 233; y += 1) {
-    for (let x = 325; x < 385; x += 1) {
+  const centers = [225, 252, 284, 311, 342, 371];
+  for (const center of centers) {
+    for (let y = center - 4; y < center + 4; y += 1) {
+      for (let x = 325; x < 650; x += 1) {
+        const offset = (y * png.width + x) * 4;
+        png.data[offset] = 180;
+        png.data[offset + 1] = 190;
+        png.data[offset + 2] = 205;
+      }
+    }
+  }
+  for (let y = centers[selected] - 5; y < centers[selected] + 5; y += 1) {
+    for (let x = 325; x < 650; x += 1) {
       const offset = (y * png.width + x) * 4;
-      png.data[offset] = 180;
-      png.data[offset + 1] = 190;
-      png.data[offset + 2] = 205;
+      png.data[offset] = 230;
+      png.data[offset + 1] = 220;
+      png.data[offset + 2] = 40;
     }
   }
   return png;
@@ -62,7 +73,9 @@ test('dopo il menu visibile P2 preme giù e Cross, senza tastiera né Rematch an
   const page = {
     screenshot: async () => {
       events.push(`capture:${captures}`);
-      return PNG.sync.write(frames[Math.min(captures++, frames.length - 1)]);
+      const frameIndex = Math.min(captures++, frames.length - 1);
+      const moved = buttons.some(([player, button, pressed]) => player === 1 && button === 'down' && !pressed);
+      return PNG.sync.write(frameIndex < 2 ? frames[frameIndex] : menuFrame(true, moved ? 1 : 0));
     },
     waitForTimeout: async () => {},
     keyboard: {
