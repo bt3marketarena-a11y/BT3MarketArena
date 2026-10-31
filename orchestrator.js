@@ -20,6 +20,8 @@ export class Orchestrator {
     this.appliedCloudRevision = -1;
     this.ui = new BroadcastUI();
     this.bridge = bridge ?? new BT3InputBridge({ window: targetWindow }).install();
+    this.features = { autoMenu: true, autoRematch: true, cinematicCombat: true, visualKO: true };
+    this.bridge.setCinematicCombat?.(this.features.cinematicCombat);
     this.engineStatus = 'MAIN-world pre-load attivo: 2 gamepad, GamepadEvent e doppio canale KeyboardEvent sul motore reale.';
     this.overrideTimer = null;
     this.memoryTimer = null;
@@ -53,6 +55,8 @@ export class Orchestrator {
   async start() {
     this.ui.bindAdmin({
       onApply: (config, action, adminKey) => this.applyConfig(config, action, adminKey),
+      onFeature: (name, enabled) => this.setFeature(name, enabled),
+      getFeatures: () => ({ ...this.features }),
       getEngineStatus: () => this.engineStatus,
     }, this.config);
     this.bridge.setMode(0, 'idle');
@@ -167,6 +171,23 @@ export class Orchestrator {
       const amountUsd = action === 'test-whale' ? Math.max(25_000, Number(this.config.whaleThreshold) * 2) : 450;
       this.market.emitTrade({ id: `manual-${Date.now()}`, side, amountUsd, timestamp: Date.now(), source: 'manual-test', marketCap: this.market.latestMarketCap, price: this.market.latestPrice, aggregate: false });
     }
+  }
+
+  setFeature(name, enabled) {
+    if (!Object.hasOwn(this.features, name)) throw new Error(`Flag sconosciuto: ${name}`);
+    if (typeof enabled !== 'boolean') throw new TypeError(`Il flag ${name} richiede un booleano.`);
+    this.features[name] = enabled;
+    if (name === 'cinematicCombat') this.bridge.setCinematicCombat(enabled);
+    return { ...this.features };
+  }
+
+  getVisualValidation() {
+    return {
+      ...(this.window.__BT3_MARKET_ARENA__?.validation ?? {}),
+      phase: this.match.phase,
+      round: this.match.round,
+      features: { ...this.features },
+    };
   }
 
   handleTrade(trade, snapshot) {

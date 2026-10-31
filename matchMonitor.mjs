@@ -16,6 +16,7 @@ export async function monitorPostMatch(page, {
         phase: window.marketArena?.match?.phase ?? 'idle',
         round: window.marketArena?.match?.round ?? 0,
         durationMs: window.marketArena?.match?.roundDurationMs ?? null,
+        features: { ...window.marketArena?.features },
       }));
       const phase = state.phase;
       const signature = `${phase}/${state.round}`;
@@ -30,7 +31,13 @@ export async function monitorPostMatch(page, {
         const activeCombat = hasActiveCombatFrame(png);
         endDetector.observe(activeCombat);
         const health = readCombatHealth(png);
-        if (koDetector.observe(health)) {
+        await page.evaluate(({ activeCombat: timerVisible, health: hp, phase: currentPhase, round }) => {
+          window.__BT3_MARKET_ARENA__.validation = {
+            checkedAt: new Date().toISOString(), phase: currentPhase, round,
+            combatTimerVisible: timerVisible, health: hp,
+          };
+        }, { activeCombat, health, phase, round: state.round });
+        if (state.features.visualKO && koDetector.observe(health)) {
           console.log('[BT3 round] HP vuote rilevate sullo schermo reale: stop prima di Character Select');
           await page.evaluate(() => window.marketArena.match.notifyKO(null, 'visual-hp-zero'));
         }
@@ -54,7 +61,7 @@ export async function monitorPostMatch(page, {
         endDetector.reset();
         koDetector.reset();
       }
-      if (phase !== 'postmatch') {
+      if (phase !== 'postmatch' || !state.features.autoRematch) {
         await page.waitForTimeout(1_000);
         continue;
       }

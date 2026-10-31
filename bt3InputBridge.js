@@ -23,24 +23,42 @@ export const KEYBOARD_MAP = Object.freeze([
 const f = (press = [], axes = null) => ({ press, axes });
 const idleFrames = (count) => Array.from({ length: count }, () => f());
 
+const zCounterLoop = [
+  f(['guard', 'left']), f(['guard', 'left']), f(), f(['cross']), f(), f(['square']), f(),
+  f(['guard', 'right']), f(['guard', 'right']), f(), f(['cross']), f(), idleFrames(2),
+].flat();
+const rushCombo = [
+  f(['square']), f(['square']), f(), f(['square']), f(), f(['triangle']), f(),
+  f(['cross']), f(), f(['square', 'triangle']), f(['square', 'triangle']), f(),
+];
+const blast2 = [
+  f(['l2']), f(['l2']), f(['l2', 'triangle']), f(['l2', 'triangle']), f(['l2', 'triangle']),
+  f(), f(['cross']), f(), idleFrames(8),
+].flat();
+const sidestep = [f(['guard', 'down']), f(['guard', 'down']), f(), f(['cross']), f()];
+const teleportCounter = [
+  f(['guard', 'left']), f(['guard', 'left']), f(), f(['cross']), f(['cross']), f(),
+  f(['square']), f(), f(['square']), f(), f(['triangle']), f(),
+];
+const cinematic = (frames) => frames.flatMap((frame) => [frame, frame, frame]);
+
 export const MACROS = Object.freeze({
-  zCounterLoop: [
-    f(['guard', 'left']), f(['guard', 'left']), f(), f(['cross']), f(), f(['square']), f(),
-    f(['guard', 'right']), f(['guard', 'right']), f(), f(['cross']), f(), idleFrames(2),
-  ].flat(),
-  rushCombo: [
-    f(['square']), f(['square']), f(), f(['square']), f(), f(['triangle']), f(),
-    f(['cross']), f(), f(['square', 'triangle']), f(['square', 'triangle']), f(),
-  ],
-  blast2: [
-    f(['l2']), f(['l2']), f(['l2', 'triangle']), f(['l2', 'triangle']), f(['l2', 'triangle']),
-    f(), f(['cross']), f(), idleFrames(8),
-  ].flat(),
+  zCounterLoop,
+  rushCombo,
+  blast2,
   ultimateFinal: [
     f(['l2']), f(['l2']), f(['l2', 'up', 'circle']), f(['l2', 'up', 'circle']),
     f(['l2', 'up', 'circle']), f(), idleFrames(36),
   ].flat(),
-  sidestep: [f(['guard', 'down']), f(['guard', 'down']), f(), f(['cross']), f()],
+  sidestep,
+  teleportCounter,
+  cinematicLoop: [
+    ...zCounterLoop, ...idleFrames(18),
+    ...cinematic(rushCombo), ...idleFrames(24),
+    ...cinematic(teleportCounter), ...idleFrames(18),
+    ...cinematic(sidestep), ...idleFrames(12),
+    ...cinematic(blast2), ...idleFrames(36),
+  ],
 });
 
 function createPad(index) {
@@ -79,6 +97,7 @@ export class BT3InputBridge {
     this.fps = fps;
     this.frameMs = 1000 / fps;
     this.keyboardEvents = keyboardEvents;
+    this.cinematicCombat = true;
     this.lockOnIntervalFrames = Math.max(2, lockOnIntervalFrames);
     this.lockOnCountdown = [0, 0];
     this.pads = [createPad(0), createPad(1)];
@@ -167,6 +186,15 @@ export class BT3InputBridge {
     });
   }
 
+  setCinematicCombat(enabled) {
+    if (typeof enabled !== 'boolean') throw new TypeError('cinematicCombat richiede un booleano.');
+    this.cinematicCombat = enabled;
+    for (let index = 0; index < 2; index += 1) {
+      if (this.modes[index] === 'neutral') this.setMode(index, 'neutral');
+    }
+    return this.cinematicCombat;
+  }
+
   setMode(index, mode, { macro = null } = {}) {
     const allowed = ['idle', 'neutral', 'attack', 'vulnerable'];
     if (!allowed.includes(mode)) throw new Error(`Modalità input sconosciuta: ${mode}`);
@@ -175,7 +203,7 @@ export class BT3InputBridge {
     if (this.runtime[index]?.resolve) this.runtime[index].resolve({ cancelled: true });
     this.runtime[index] = null;
     this.releaseAll(index);
-    if (mode === 'neutral') return this.playMacro(index, 'zCounterLoop', { loop: true });
+    if (mode === 'neutral') return this.playMacro(index, this.cinematicCombat ? 'cinematicLoop' : 'zCounterLoop', { loop: true });
     if (mode === 'attack') return this.playMacro(index, macro ?? 'rushCombo', { loop: macro !== 'ultimateFinal' });
     return Promise.resolve({ cancelled: false });
   }

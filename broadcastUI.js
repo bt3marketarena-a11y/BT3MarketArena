@@ -8,7 +8,7 @@ function formatPrice(value) {
 }
 
 const ADMIN_CSS = `
-:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#080d13;color:#e7edf3}*{box-sizing:border-box}body{margin:0;padding:26px}.admin-form{display:flex;flex-direction:column;gap:14px}.admin-heading{display:flex;justify-content:space-between;align-items:center}.admin-heading small{color:#35f2a0;font:700 10px ui-monospace,monospace;letter-spacing:2px}.admin-heading h1{margin:3px 0 0;font-size:26px}.admin-heading>span{padding:6px 9px;border:1px solid #31404f;color:#8f9aa6;font:12px ui-monospace,monospace}.admin-note{margin:0;color:#8c99a7;font-size:12px;line-height:1.5}.admin-form label{display:flex;flex-direction:column;gap:6px;color:#a9b5c0;font-size:12px}.admin-form input,.admin-form select{width:100%;padding:11px 12px;border:1px solid #2a3846;border-radius:5px;background:#101822;color:#edf4fa;outline:none}.admin-form input:focus,.admin-form select:focus{border-color:#35f2a0}.admin-form hr{width:100%;border:0;border-top:1px solid #24313e;margin:5px 0}.admin-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.admin-actions.three{grid-template-columns:1fr 1fr 1fr}.admin-form button{padding:11px;border:0;border-radius:5px;background:#35f2a0;color:#06120d;font-weight:800;cursor:pointer}.admin-form button.secondary{background:#1b2936;color:#dbe5ed;border:1px solid #314252}.admin-form button.danger{background:#ffbd45;color:#201400}.admin-form button.wide{width:100%}.admin-heading-small{color:#e1e9f0;font-weight:750;font-size:13px}.admin-heading-small span{color:#718091;font-size:11px;font-weight:400}.offset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.engine-status{padding:10px;background:#101822;border-left:2px solid #35f2a0;color:#9cadba;font-size:11px;line-height:1.45}.admin-output{min-height:18px;color:#35f2a0;font-size:12px}.admin-output.error{color:#ff7188}`;
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#080d13;color:#e7edf3}*{box-sizing:border-box}body{margin:0;padding:26px}.admin-form{display:flex;flex-direction:column;gap:14px}.admin-heading{display:flex;justify-content:space-between;align-items:center}.admin-heading small{color:#35f2a0;font:700 10px ui-monospace,monospace;letter-spacing:2px}.admin-heading h1{margin:3px 0 0;font-size:26px}.admin-heading>span{padding:6px 9px;border:1px solid #31404f;color:#8f9aa6;font:12px ui-monospace,monospace}.admin-note{margin:0;color:#8c99a7;font-size:12px;line-height:1.5}.admin-form label{display:flex;flex-direction:column;gap:6px;color:#a9b5c0;font-size:12px}.admin-form input,.admin-form select{width:100%;padding:11px 12px;border:1px solid #2a3846;border-radius:5px;background:#101822;color:#edf4fa;outline:none}.admin-form input:focus,.admin-form select:focus{border-color:#35f2a0}.admin-form hr{width:100%;border:0;border-top:1px solid #24313e;margin:5px 0}.admin-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.admin-actions.three{grid-template-columns:1fr 1fr 1fr}.admin-form button{padding:11px;border:0;border-radius:5px;background:#35f2a0;color:#06120d;font-weight:800;cursor:pointer}.admin-form button.secondary{background:#1b2936;color:#dbe5ed;border:1px solid #314252}.admin-form button.danger{background:#ffbd45;color:#201400}.admin-form button.wide{width:100%}.admin-heading-small{color:#e1e9f0;font-weight:750;font-size:13px}.admin-heading-small span{color:#718091;font-size:11px;font-weight:400}.offset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.engine-status{padding:10px;background:#101822;border-left:2px solid #35f2a0;color:#9cadba;font-size:11px;line-height:1.45}.admin-output{min-height:18px;color:#35f2a0;font-size:12px}.admin-output.error{color:#ff7188}.admin-features{display:grid;grid-template-columns:1fr 1fr;gap:10px}.admin-form .admin-features label{flex-direction:row;align-items:center;gap:8px;padding:9px;border:1px solid #24313e;border-radius:5px;background:#101822}.admin-form input[type=checkbox]{width:16px;height:16px;padding:0;accent-color:#35f2a0}`;
 
 export function describeTrade(trade) {
   const attacker = trade.side === 'BUY' ? 'P1' : 'P2';
@@ -149,6 +149,21 @@ export class BroadcastUI {
     const output = form.querySelector('.admin-output');
     const engineStatus = form.querySelector('#engine-status');
     if (callbacks.getEngineStatus) engineStatus.textContent = callbacks.getEngineStatus();
+    const features = callbacks.getFeatures?.() ?? {};
+    form.querySelectorAll('input[data-feature]').forEach((input) => {
+      input.checked = features[input.dataset.feature] ?? true;
+      input.addEventListener('change', () => {
+        try {
+          callbacks.onFeature?.(input.dataset.feature, input.checked);
+          output.classList.remove('error');
+          output.textContent = `${input.dataset.feature}: ${input.checked}`;
+        } catch (error) {
+          input.checked = !input.checked;
+          output.classList.add('error');
+          output.textContent = error.message;
+        }
+      });
+    });
     const readConfig = () => {
       const values = Object.fromEntries(new FormData(form).entries());
       const adminKey = String(values.adminKey ?? '');

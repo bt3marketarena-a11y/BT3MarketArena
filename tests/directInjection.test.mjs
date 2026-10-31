@@ -58,6 +58,9 @@ test('il monitor rileva la fine match e il launcher conserva la cattura Windows'
   assert.match(monitor, /readCombatHealth/);
   assert.match(launcher, /captureGameFrame/);
   assert.match(monitor, /notifyKO\(null, 'visual-hp-zero'\)/);
+  assert.match(monitor, /features\.visualKO/);
+  assert.match(monitor, /features\.autoRematch/);
+  assert.match(monitor, /validation\s*=/);
 });
 
 test('Start attraversa la schermata VS su tastiera e gamepad P1', async () => {
@@ -69,6 +72,12 @@ test('Start attraversa la schermata VS su tastiera e gamepad P1', async () => {
   assert.match(driver, /await tap\('k', 300\)/);
   assert.match(driver, /await padTap\('cross', 300\)/);
   assert.match(driver, /hasCombatHudFrame/);
+});
+
+test('il bootstrap web rispetta il flag autoMenu', async () => {
+  const bootstrap = await read('webBootstrap.js');
+  assert.match(bootstrap, /features\.autoMenu/);
+  assert.match(bootstrap, /menuSequence = 'disabled'/);
 });
 
 test('il bootstrap installa il bridge prima del montaggio DOM', async () => {

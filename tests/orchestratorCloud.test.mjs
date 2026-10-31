@@ -54,6 +54,41 @@ test('il form admin contiene una password non persistente', async () => {
   assert.match(ui, /onApply\(values, action, adminKey\)/);
 });
 
+test('i flag accettano soltanto booleani e aggiornano subito la coreografia', () => {
+  const calls = [];
+  const fake = {
+    features: { autoMenu: true, autoRematch: true, cinematicCombat: true, visualKO: true },
+    bridge: { setCinematicCombat: (enabled) => calls.push(enabled) },
+  };
+  assert.equal(typeof Orchestrator.prototype.setFeature, 'function');
+  assert.deepEqual(Orchestrator.prototype.setFeature.call(fake, 'cinematicCombat', false), {
+    autoMenu: true, autoRematch: true, cinematicCombat: false, visualKO: true,
+  });
+  assert.deepEqual(calls, [false]);
+  assert.throws(() => Orchestrator.prototype.setFeature.call(fake, 'unknown', true), /Flag sconosciuto/);
+  assert.throws(() => Orchestrator.prototype.setFeature.call(fake, 'visualKO', 1), /booleano/);
+});
+
+test('la validazione visiva espone fase, round, flag e ultimo frame', () => {
+  const fake = {
+    features: { autoMenu: true, autoRematch: true, cinematicCombat: true, visualKO: true },
+    match: { phase: 'fighting', round: 3 },
+    window: { __BT3_MARKET_ARENA__: { validation: { combatTimerVisible: true, health: { p1: true, p2: false } } } },
+  };
+  assert.equal(typeof Orchestrator.prototype.getVisualValidation, 'function');
+  assert.deepEqual(Orchestrator.prototype.getVisualValidation.call(fake), {
+    combatTimerVisible: true, health: { p1: true, p2: false }, phase: 'fighting', round: 3,
+    features: { autoMenu: true, autoRematch: true, cinematicCombat: true, visualKO: true },
+  });
+});
+
+test('il pannello admin espone i quattro flag booleani', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  for (const name of ['autoMenu', 'autoRematch', 'cinematicCombat', 'visualKO']) {
+    assert.match(html, new RegExp(`data-feature="${name}"`));
+  }
+});
+
 test('destroy chiude anche la sottoscrizione SSE', () => {
   let closed = false;
   const fake = {

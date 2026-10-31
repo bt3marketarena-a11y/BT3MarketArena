@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BT3InputBridge, BUTTONS } from '../bt3InputBridge.js';
+import { BT3InputBridge, BUTTONS, MACROS } from '../bt3InputBridge.js';
 
 function fakeWindow() {
   return {
@@ -97,4 +97,25 @@ test('il combattimento riattiva periodicamente il lock-on L1 su entrambi i pad',
   bridge.stepFrame();
   assert.equal(bridge.getPad(0).buttons[BUTTONS.l1].pressed, false);
   assert.equal(bridge.getPad(1).buttons[BUTTONS.l1].pressed, false);
+});
+
+test('la coreografia cinematografica include teleport, counter e Blast 2', () => {
+  assert.ok(MACROS.teleportCounter.some((frame) => frame.press.includes('cross')));
+  assert.ok(MACROS.teleportCounter.some((frame) => frame.press.includes('guard')));
+  assert.ok(MACROS.cinematicLoop.some((frame) => frame.press.includes('square')));
+  assert.ok(MACROS.cinematicLoop.some((frame) => frame.press.includes('triangle')));
+  assert.ok(MACROS.cinematicLoop.length > MACROS.zCounterLoop.length * 4);
+});
+
+test('il flag cinematicCombat cambia subito la macro neutra e ripulisce gli input', () => {
+  const bridge = new BT3InputBridge({ window: fakeWindow(), autoStart: false });
+  bridge.install();
+  bridge.setMode(0, 'neutral');
+  assert.equal(bridge.runtime[0].name, 'cinematicLoop');
+  assert.equal(typeof bridge.setCinematicCombat, 'function');
+  bridge.setCinematicCombat(false);
+  assert.equal(bridge.runtime[0].name, 'zCounterLoop');
+  bridge.setMode(0, 'idle');
+  assert.equal(bridge.runtime[0], null);
+  assert.equal(bridge.getPad(0).buttons.every((button) => !button.pressed), true);
 });

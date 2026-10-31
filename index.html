@@ -58,6 +58,14 @@
       <label>Timeout opzionale round (secondi, 0 = solo KO)<input name="roundDurationSec" type="number" min="0" value="0"></label>
       <button type="submit" class="secondary wide" data-action="memory">Applica memory bridge</button>
       <hr>
+      <div class="admin-heading-small">Runtime feature flags</div>
+      <div class="admin-features">
+        <label><input type="checkbox" data-feature="autoMenu" checked> Auto menu</label>
+        <label><input type="checkbox" data-feature="autoRematch" checked> Auto Character Select after KO</label>
+        <label><input type="checkbox" data-feature="cinematicCombat" checked> Cinematic combat</label>
+        <label><input type="checkbox" data-feature="visualKO" checked> Visual KO detection</label>
+      </div>
+      <hr>
       <div class="admin-heading-small">Test impatti sul motore reale</div>
       <div class="admin-actions three"><button type="button" class="secondary" data-action="test-buy">BUY test</button><button type="button" class="secondary" data-action="test-sell">SELL test</button><button type="button" class="danger" data-action="test-whale">WHALE test</button></div>
       <output class="admin-output" aria-live="polite"></output>
