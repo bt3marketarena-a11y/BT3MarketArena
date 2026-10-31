@@ -7,6 +7,7 @@ export async function monitorPostMatch(page, {
 } = {}) {
   if (!capture) throw new Error('monitorPostMatch richiede una funzione di cattura.');
   let lastState = '';
+  let lastHealth = null;
   let inputsSuspended = false;
   const endDetector = new CombatEndDetector({ delayMs: 12_000 });
   const koDetector = new KnockoutDetector({ delayMs: 1_500 });
@@ -31,6 +32,7 @@ export async function monitorPostMatch(page, {
         const pauseMenu = hasPauseMenuFrame(png);
         const activeCombat = hasActiveCombatFrame(png);
         const health = readCombatHealth(png);
+        if (!pauseMenu) lastHealth = health;
         await page.evaluate(({ activeCombat: timerVisible, health: hp, pauseMenuVisible, phase: currentPhase, round }) => {
           window.__BT3_MARKET_ARENA__.validation = {
             checkedAt: new Date().toISOString(), phase: currentPhase, round,
@@ -85,7 +87,9 @@ export async function monitorPostMatch(page, {
         await page.waitForTimeout(1_000);
         continue;
       }
-      const plan = await runRematchSequence(page);
+      // Il menu dei risultati appartiene al vincitore: 1P usa tastiera, 2P gamepad.
+      const menuPlayer = lastHealth?.p1 && !lastHealth?.p2 ? 0 : 1;
+      const plan = await runRematchSequence(page, { menuPlayer });
       console.log(`[BT3 round] nuovo match con roster e stage random: ${JSON.stringify(plan)}`);
     } catch (error) {
       if (isClosed()) break;

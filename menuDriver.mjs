@@ -104,7 +104,20 @@ export function hasPauseMenuFrame(png) {
       samples += 1;
     }
   }
-  return samples > 0 && dark / samples > 0.45 && brightText > 40;
+  return samples > 0 && dark / samples > 0.45 && brightText > 24;
+}
+
+export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 500 } = {}) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const png = PNG.sync.read(await page.screenshot());
+    if (hasPauseMenuFrame(png)) {
+      console.log('[BT3 menu] menu dei risultati visibile: selezione Character Select abilitata');
+      return;
+    }
+    await wait(page, pollMs);
+  }
+  throw new Error('Menu dei risultati non visibile: nessun tasto di conferma inviato alla cieca.');
 }
 
 export class CombatEndDetector {
@@ -289,19 +302,28 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
 
 /** Dopo KO/timeout evita Rematch: seconda voce = Character Select. */
 export async function runRematchSequence(page, options = {}) {
-  const { tap, progress } = createMenuControls(page, options.onProgress ?? (() => {}));
+  const { tap, padTap, progress } = createMenuControls(page, options.onProgress ?? (() => {}));
+  const menuPlayer = options.menuPlayer === 0 ? 0 : 1;
+  const rosterSequence = options.rosterSequence ?? runRosterSequence;
   await page.evaluate(() => {
     window.marketArena.bridge.setMode(0, 'idle');
     window.marketArena.bridge.setMode(1, 'idle');
     document.querySelector('canvas')?.focus();
   });
-  await wait(page, 1_000);
-  progress('post-match: Character Select, non Rematch');
-  await tap('ArrowDown', 400);
-  await wait(page, 1_200);
-  await tap('k', 400);
+  progress('attesa visiva del menu dei risultati; nessuna conferma anticipata');
+  await waitForResultsMenu(page);
+  progress(`post-match P${menuPlayer + 1}: Character Select, non Rematch`);
+  if (menuPlayer === 0) {
+    await tap('ArrowDown', 400);
+    await wait(page, 1_200);
+    await tap('k', 400);
+  } else {
+    await padTap('down', 400);
+    await wait(page, 1_200);
+    await padTap('cross', 400);
+  }
   await wait(page, 8_000);
-  return runRosterSequence(page, options);
+  return rosterSequence(page, options);
 }
 
 /** Guida il primo ingresso nel vero menu PS2 fino al Character Select. */
