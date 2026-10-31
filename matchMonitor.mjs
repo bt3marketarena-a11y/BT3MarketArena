@@ -28,7 +28,12 @@ export async function monitorPostMatch(page, {
       if (phase === 'fighting') {
         const png = PNG.sync.read(await capture(page));
         const activeCombat = hasActiveCombatFrame(png);
-        const visualEnd = endDetector.observe(activeCombat);
+        endDetector.observe(activeCombat);
+        const health = readCombatHealth(png);
+        if (koDetector.observe(health)) {
+          console.log('[BT3 round] HP vuote rilevate sullo schermo reale: stop prima di Character Select');
+          await page.evaluate(() => window.marketArena.match.notifyKO(null, 'visual-hp-zero'));
+        }
         if (activeCombat) {
           if (inputsSuspended) {
             await page.evaluate(() => {
@@ -37,24 +42,13 @@ export async function monitorPostMatch(page, {
             });
             inputsSuspended = false;
           }
-          if (koDetector.observe(readCombatHealth(png))) {
-            console.log('[BT3 round] HP vuote rilevate sullo schermo reale: stop prima di Rematch');
-            await page.evaluate(() => window.marketArena.match.notifyKO(null, 'visual-hp-zero'));
-          }
-        } else {
-          koDetector.reset();
-          if (!inputsSuspended && endDetector.missingSince !== null && Date.now() - endDetector.missingSince >= 2_000) {
-            console.log('[BT3 round] timer assente: pad sospesi durante la sequenza di vittoria');
-            await page.evaluate(() => {
-              window.marketArena.bridge.setMode(0, 'idle');
-              window.marketArena.bridge.setMode(1, 'idle');
-            });
-            inputsSuspended = true;
-          }
-          if (visualEnd) {
-            console.log('[BT3 round] timer originale assente per 12 s: fine match rilevata');
-            await page.evaluate(() => window.marketArena.match.notifyKO(null, 'visual-result'));
-          }
+        } else if (!inputsSuspended && endDetector.missingSince !== null && Date.now() - endDetector.missingSince >= 2_000) {
+          console.log('[BT3 round] timer assente: pad sospesi, ma nessun KO senza una HP vuota');
+          await page.evaluate(() => {
+            window.marketArena.bridge.setMode(0, 'idle');
+            window.marketArena.bridge.setMode(1, 'idle');
+          });
+          inputsSuspended = true;
         }
       } else {
         endDetector.reset();

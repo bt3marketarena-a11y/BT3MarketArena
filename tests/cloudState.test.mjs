@@ -24,6 +24,12 @@ test('lo stato cloud valida e persiste soltanto la configurazione pubblica', asy
   assert.equal(Object.hasOwn(updated, 'adminKey'), false);
 });
 
+test('lo stato cloud permette il timeout zero per combattere fino al KO', async () => {
+  const store = new CloudStateStore({ stateFile: null });
+  assert.equal((await store.get()).roundDurationSec, 0);
+  assert.equal((await store.update({ roundDurationSec: 0 })).roundDurationSec, 0);
+});
+
 test('lo stato rifiuta segreti, mint e sorgenti non validi', async () => {
   const store = new CloudStateStore({ stateFile: null });
   await assert.rejects(store.update({ adminKey: 'secret' }), /non consentiti/);

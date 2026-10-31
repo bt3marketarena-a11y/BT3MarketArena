@@ -40,7 +40,7 @@ export class MatchAutomator {
     random = Math.random,
     koDelayMs = 3_000,
     menuDelayMs = 1_200,
-    roundDurationMs = 300_000,
+    roundDurationMs = 0,
     autoStart = false,
   } = {}) {
     this.inputBridge = inputBridge;

@@ -53,9 +53,9 @@
       <label>WebSocket RPC<input name="wsUrl" value="wss://api.mainnet-beta.solana.com"></label>
       <label>HTTP RPC<input name="httpUrl" value="https://api.mainnet-beta.solana.com"></label>
       <div class="admin-heading-small">Wasm Memory Bridge <span>opzionale</span></div>
-      <p class="admin-note">Offset decimali specifici della build remota. Senza offset, il cambio round usa il timer di sicurezza.</p>
+      <p class="admin-note">Offset decimali specifici della build remota. Il cambio round richiede un KO visivo o un timeout positivo.</p>
       <div class="offset-grid"><label>Fase<input name="phaseOffset" type="number" min="0" placeholder="—"></label><label>HP P1<input name="hp1Offset" type="number" min="0" placeholder="—"></label><label>HP P2<input name="hp2Offset" type="number" min="0" placeholder="—"></label></div>
-      <label>Durata sicurezza round (secondi)<input name="roundDurationSec" type="number" min="10" value="120"></label>
+      <label>Timeout opzionale round (secondi, 0 = solo KO)<input name="roundDurationSec" type="number" min="0" value="0"></label>
       <button type="submit" class="secondary wide" data-action="memory">Applica memory bridge</button>
       <hr>
       <div class="admin-heading-small">Test impatti sul motore reale</div>

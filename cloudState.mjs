@@ -10,7 +10,7 @@ export const DEFAULT_PUBLIC_STATE = Object.freeze({
   phaseOffset: '',
   hp1Offset: '',
   hp2Offset: '',
-  roundDurationSec: 300,
+  roundDurationSec: 0,
 });
 
 const ALLOWED_FIELDS = new Set(Object.keys(DEFAULT_PUBLIC_STATE));
@@ -22,7 +22,7 @@ export function validatePublicState(state) {
     throw new Error('Inserisci una mint Solana valida (32–44 caratteri Base58).');
   }
   if (!Number.isFinite(state.whaleThreshold) || state.whaleThreshold < 1) throw new Error('Whale threshold non valido.');
-  if (!Number.isFinite(state.roundDurationSec) || state.roundDurationSec < 10) throw new Error('Durata round non valida.');
+  if (!Number.isFinite(state.roundDurationSec) || state.roundDurationSec < 0) throw new Error('Durata round non valida.');
   if (!/^wss?:\/\//i.test(state.wsUrl)) throw new Error('WebSocket RPC non valido.');
   if (!/^https?:\/\//i.test(state.httpUrl)) throw new Error('HTTP RPC non valido.');
   for (const key of ['phaseOffset', 'hp1Offset', 'hp2Offset']) {

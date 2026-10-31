@@ -4,9 +4,12 @@ import { MatchAutomator, WasmMemoryBridge, createRosterPlan } from '../matchAuto
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-test('il timeout di sicurezza non anticipa il timer reale di 240 secondi', () => {
+test('il round predefinito non ha timeout e attende il KO reale', () => {
   const automator = new MatchAutomator();
-  assert.equal(automator.roundDurationMs, 300_000);
+  assert.equal(automator.roundDurationMs, 0);
+  automator.start();
+  assert.equal(automator.timers.size, 0);
+  automator.stop();
 });
 
 test('createRosterPlan genera posizioni valide per 161 personaggi', () => {

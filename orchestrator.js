@@ -8,7 +8,7 @@ const STORAGE_KEY = 'bt3-market-arena-direct-v2';
 const DEFAULT_CONFIG = {
   source: 'simulation', ca: '', whaleThreshold: 10_000,
   wsUrl: 'wss://api.mainnet-beta.solana.com', httpUrl: 'https://api.mainnet-beta.solana.com',
-  phaseOffset: '', hp1Offset: '', hp2Offset: '', roundDurationSec: 300,
+  phaseOffset: '', hp1Offset: '', hp2Offset: '', roundDurationSec: 0,
 };
 
 export class Orchestrator {
@@ -93,7 +93,7 @@ export class Orchestrator {
     const { revision: ignoredRevision, updatedAt: ignoredUpdatedAt, ...config } = state;
     this.config = { ...this.config, ...config };
     this.ui.currentConfig = { ...this.ui.currentConfig, ...this.config };
-    this.match.roundDurationMs = Math.max(10, Number(this.config.roundDurationSec) || 300) * 1000;
+    this.match.roundDurationMs = Math.max(0, Number(this.config.roundDurationSec) || 0) * 1000;
     this.market.whaleThresholdUsd = Math.max(1, Number(this.config.whaleThreshold) || 10_000);
     if (this.config.source === 'simulation') {
       await this.market.startSimulation();
@@ -159,7 +159,7 @@ export class Orchestrator {
     }
     if (action === 'memory') {
       this.configureMemoryBridge();
-      this.match.roundDurationMs = Math.max(10, Number(this.config.roundDurationSec) || 300) * 1000;
+      this.match.roundDurationMs = Math.max(0, Number(this.config.roundDurationSec) || 0) * 1000;
       return;
     }
     if (action.startsWith('test-')) {
