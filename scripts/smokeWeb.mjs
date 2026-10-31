@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createArenaServer } from '../server.mjs';
+import { createArenaServer } from './arenaServer.mjs';
 import { findChromeExecutable } from '../launcher.mjs';
 
 const full = process.argv.includes('--full');

@@ -69,7 +69,7 @@ Dopo modifiche a HTML/CSS/moduli non serve una build separata: il bundle viene r
 Browser spettatore
   │ HTTPS same-origin
   ▼
-server.mjs ────────────────► dragonballbt3.online
+scripts/arenaServer.mjs ────────────────► dragonballbt3.online
   │ inject bundle nel primo <head>     runtime.html / JS / Wasm / dati / Range
   ├─ GET/PATCH /api/state ◄── CloudStateStore → STATE_FILE
   ├─ GET /api/events ───────► SSE revisione CA a tutti i client
@@ -78,7 +78,7 @@ server.mjs ────────────────► dragonballbt3.onl
 
 Docker cloud-stream.sh
   ├─ Xvfb :99 1920x1080x24 + PulseAudio
-  ├─ server.mjs (admin remoto)
+  ├─ scripts/arenaServer.mjs (admin remoto)
   ├─ launcher.mjs via proxy locale ?inject=0, BT3_CLOUD_SYNC=1
   └─ FFmpeg x11grab 60 fps + PulseAudio → STREAM_RTMP_URL
 ```
@@ -89,7 +89,7 @@ Il proxy non inoltra `ADMIN_KEY` all'upstream. Le risposte HTML eliminano CSP/en
 
 `CloudStateStore` accetta soltanto campi pubblici noti, normalizza numeri/URL/mint, incrementa `revision` e scrive JSON con rename atomico. `CloudConfigClient` invia la password solo come Bearer; `BroadcastUI` elimina `adminKey` dal FormData prima di chiamare l'Orchestrator. In modalità cloud l'Orchestrator non salva la configurazione admin in `localStorage`, applica una revisione una sola volta e chiude SSE in `destroy()`.
 
-`STATE_FILE` deve risiedere su un volume persistente in Render/Railway. Su Vercel la build `scripts/build-static-vercel.mjs` genera HTML e bundle in `public/`, con fallback `templates/runtime.fallback.html`; home/runtime sono statici e non importano `server.mjs`. Soltanto `api/state.mjs` gestisce stato e SSE in memoria, mentre gli asset del motore usano rewrite CDN esterni. Non esiste persistenza o coordinamento CA/SSE fra istanze senza uno storage esterno. Il piano Vercel non esegue lo streamer Chromium/FFmpeg. Lo streamer richiede `STREAM_RTMP_URL`; FFmpeg ritenta ogni 5 secondi, mentre la terminazione di server/launcher arresta il container per consentire il restart esterno. Nessun deploy o stream pubblico è incluso nella verifica locale.
+`STATE_FILE` deve risiedere su un volume persistente in Render/Railway. Su Vercel la build `scripts/build-static-vercel.mjs` genera HTML e bundle in `public/`, con fallback `templates/runtime.fallback.html`; home/runtime sono statici e non importano `scripts/arenaServer.mjs`. Soltanto `api/state.mjs` gestisce stato e SSE in memoria; `/admin` usa il file statico e le altre rotte ricadono su `index.html`. Il proxy è spostato in `scripts/arenaServer.mjs` perché un `server.*` nella radice o in `src/` viene rilevato da Vercel come Function Node implicita e causava `FUNCTION_INVOCATION_FAILED` anche su `/`. Non esiste persistenza o coordinamento CA/SSE fra istanze senza uno storage esterno. Il piano Vercel non esegue lo streamer Chromium/FFmpeg. Lo streamer richiede `STREAM_RTMP_URL`; FFmpeg ritenta ogni 5 secondi, mentre la terminazione di server/launcher arresta il container per consentire il restart esterno. Nessun deploy o stream pubblico è incluso nella verifica locale.
 
 ## Input
 

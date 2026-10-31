@@ -17,7 +17,7 @@ test('il Dockerfile contiene Chromium, Xvfb, PulseAudio e FFmpeg', async () => {
 test('lo streamer avvia display, server e launcher calibrato prima di FFmpeg', async () => {
   const script = await read('cloud-stream.sh');
   assert.match(script, /Xvfb :99 -screen 0 1920x1080x24/);
-  assert.match(script, /node server\.mjs/);
+  assert.match(script, /node scripts\/arenaServer\.mjs/);
   assert.match(script, /BT3_CLOUD_SYNC=1/);
   assert.match(script, /BT3_TARGET_URL=.*inject=0/);
   assert.match(script, /node launcher\.mjs/);

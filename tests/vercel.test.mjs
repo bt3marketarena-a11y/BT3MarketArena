@@ -72,3 +72,12 @@ test('Vercel forza il routing statico e conserva soltanto la Function state', as
   assert.match(ignore, /^artifacts\/$/m);
   assert.match(ignore, /^\.playwright\/$/m);
 });
+
+test('Vercel non rileva un server Node implicito nella radice', () => {
+  for (const directory of ['../', '../src/']) {
+    for (const extension of ['js', 'cjs', 'mjs', 'ts', 'cts', 'mts']) {
+      const entrypoint = new URL(`${directory}server.${extension}`, import.meta.url);
+      assert.equal(existsSync(entrypoint), false, `Entrypoint Vercel implicito: ${entrypoint.pathname}`);
+    }
+  }
+});

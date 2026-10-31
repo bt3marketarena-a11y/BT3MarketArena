@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
-import { createArenaServer, injectBundle } from '../server.mjs';
+import { createArenaServer, injectBundle } from '../scripts/arenaServer.mjs';
 
 async function listen(server) {
   server.listen(0, '127.0.0.1');
@@ -164,7 +164,7 @@ test('inject=0 riservato al launcher evita una seconda automazione nel container
 });
 
 test('il server web accetta host e porta inoltrati da npm run dev', async () => {
-  const { resolveListenOptions } = await import('../server.mjs');
+  const { resolveListenOptions } = await import('../scripts/arenaServer.mjs');
   assert.deepEqual(resolveListenOptions(['--host', '0.0.0.0', '--port', '7100'], {}), { host: '0.0.0.0', port: 7100 });
   assert.deepEqual(resolveListenOptions(['--port=7200'], { PORT: '3000' }), { host: '0.0.0.0', port: 7200 });
 });

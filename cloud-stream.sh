@@ -29,7 +29,7 @@ for _ in {1..30}; do
 done
 [[ -S /tmp/.X11-unix/X99 ]] || { echo "Xvfb non disponibile." >&2; exit 1; }
 
-node server.mjs &
+node scripts/arenaServer.mjs &
 SERVER_PID=$!
 for _ in {1..30}; do
   if curl --fail --silent "http://127.0.0.1:${PORT}/healthz" >/dev/null; then break; fi

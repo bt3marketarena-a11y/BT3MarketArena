@@ -43,7 +43,7 @@ ADMIN_KEY='sostituisci-con-una-password-lunga' npm run start:web
 
 Apri `http://localhost:3000/` per il gioco e `http://localhost:3000/admin` per il Control Room remoto. In produzione usa sempre HTTPS. `npm run dev` è un alias adatto all'anteprima e accetta gli argomenti `--host` e `--port`.
 
-`server.mjs` proxya `runtime.html`, JavaScript, Wasm, dati e richieste Range verso `https://dragonballbt3.online`. Il visitatore non esegue Playwright: il bundle viene iniettato come primo script nell'`<head>`, prima di Emscripten. HTML, asset e API condividono la stessa origine, eliminando iframe e CORS fra gioco e HUD.
+`scripts/arenaServer.mjs` proxya `runtime.html`, JavaScript, Wasm, dati e richieste Range verso `https://dragonballbt3.online`. Il visitatore non esegue Playwright: il bundle viene iniettato come primo script nell'`<head>`, prima di Emscripten. HTML, asset e API condividono la stessa origine, eliminando iframe e CORS fra gioco e HUD.
 
 Il bootstrap web installa:
 
@@ -70,7 +70,7 @@ Il pannello F2 della web app usa lo stesso endpoint: prima salva lo stato sul se
 
 La build `npm run build` scarica il runtime reale, compila il bundle web e genera `public/index.html`, `public/runtime.html`, `public/bt3-arena-bundle.js` e `public/admin.html`. Se upstream è offline usa `templates/runtime.fallback.html`. La home e il runtime sono quindi serviti dal CDN statico e non invocano alcuna Function.
 
-`vercel.json` pubblica `public/`, instrada soltanto `/api/state` e `/api/events` alla Function isolata `api/state.mjs`, e usa rewrite esterni nativi per tutti gli asset del motore, inclusi quelli oltre 4,5 MB. Importa la repository con framework **Other** e configura `ADMIN_KEY`; non impostare `STATE_FILE`.
+`vercel.json` pubblica `public/`, mantiene `/api/state` e `/api/events` nella Function isolata `api/state.mjs`, instrada `/admin` su `admin.html` e usa `index.html` come fallback statico. Il server proxy locale risiede in `scripts/arenaServer.mjs`: non deve esistere un entrypoint `server.*` nella radice o in `src/`, perché Vercel lo rileverebbe automaticamente come Function Node per tutte le rotte. Importa la repository con framework **Other** e configura `ADMIN_KEY`; non impostare `STATE_FILE`.
 
 Su Vercel la memoria è effimera e le richieste possono raggiungere istanze differenti: lo stato CA e gli aggiornamenti SSE possono quindi essere persi o non coincidere fra istanze. Per sincronizzazione globale affidabile serve uno storage/pub-sub esterno; in alternativa usa Render/Railway con volume. Vercel ospita soltanto la web app, non il container Chromium/FFmpeg 24/7.
 
@@ -103,7 +103,7 @@ Crea un servizio dal repository con gli stessi comandi build/start, oppure lasci
 Il `Dockerfile` contiene Node.js, Chromium/Playwright, Xvfb, PulseAudio e FFmpeg. `cloud-stream.sh` esegue:
 
 1. PulseAudio e `Xvfb :99 -screen 0 1920x1080x24`.
-2. `server.mjs` per `/admin`, `/api/state`, `/api/events` e `/healthz`.
+2. `scripts/arenaServer.mjs` per `/admin`, `/api/state`, `/api/events` e `/healthz`.
 3. Il normale `launcher.mjs` in modalità headed/kiosk, con `BT3_CLOUD_SYNC=1`.
 4. FFmpeg con `x11grab` a 60 fps, audio PulseAudio, H.264/AAC e destinazione `STREAM_RTMP_URL`.
 
@@ -247,7 +247,7 @@ Il canvas mantiene il rapporto d'aspetto del gioco; eventuali bande laterali app
 | `matchAutomator.js` | Round, random roster e memory adapter |
 | `orchestrator.js` | Collegamento mercato → input reali, stato locale/cloud e gestione runtime |
 | `broadcastUI.js` | HUD e Control Room F2 |
-| `server.mjs` | Reverse proxy, API admin, SSE, healthcheck e avvio web |
+| `scripts/arenaServer.mjs` | Reverse proxy, API admin, SSE, healthcheck e avvio web |
 | `cloudState.mjs` | Validazione, revisioni e persistenza atomica dello stato globale |
 | `cloudClient.js` | Client HTTP/SSE same-origin per F2 e spettatori |
 | `injectionBundle.mjs` | Bundle Playwright/web condiviso, alias PNG browser |
