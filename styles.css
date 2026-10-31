@@ -11,3 +11,6 @@ canvas{position:fixed!important;inset:0!important;width:100vw!important;height:1
 .ticker{left:2vw;right:2vw;bottom:20px;height:5vh;padding:0 1vw;background:rgba(3,6,10,.94)}
 .fighters{top:auto;left:36vw;right:2vw;bottom:30vh}
 @media(max-aspect-ratio:4/3){.trade-feed{width:38vw}.dominance{left:43vw}.brand-sub,.roster-label{display:none}}
+
+/* Il feed chiuso lascia soltanto una barra; il pulsante è l'unica parte interattiva. */
+.feed-title{margin:0}.feed-title button{display:flex;align-items:center;gap:.55vw;padding:.45vw .65vw;border:1px solid rgba(255,255,255,.18);border-radius:3px;background:rgba(3,7,11,.88);color:#d4dce4;font:700 .6vw/1 ui-monospace,monospace;letter-spacing:.14em;pointer-events:auto;cursor:pointer}.feed-title button:hover,.feed-title button:focus-visible{border-color:var(--green);color:var(--green);outline:none}.feed-chevron{display:inline-block;transition:transform .18s ease}.trade-feed.is-open .feed-chevron{transform:rotate(90deg)}.trade-feed:not(.is-open){max-height:2.2vw;overflow:visible}.trade-feed.is-open{max-height:35vh}#trade-list[hidden]{display:none}.trade-feed.is-open #trade-list{margin-top:.65vw}
