@@ -61,6 +61,7 @@ test('Vercel forza il routing statico e conserva soltanto la Function state', as
     buildCommand: 'npm run build',
     outputDirectory: 'public',
     rewrites: [
+      { source: '/api/events', destination: '/api/state?events=1' },
       { source: '/api/(.*)', destination: '/api/$1' },
       { source: '/admin', destination: '/admin.html' },
       {
