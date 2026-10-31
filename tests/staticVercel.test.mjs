@@ -1,0 +1,45 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { buildStaticVercel } from '../scripts/build-static-vercel.mjs';
+
+async function workspace(t) {
+  const directory = await mkdtemp(path.join(process.cwd(), 'artifacts', 'static-vercel-test-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  return directory;
+}
+
+test('la build Vercel genera home e runtime statici con bundle precompilato', async (t) => {
+  const directory = await workspace(t);
+  const source = '<!doctype html><html><head><meta charset="utf-8"><script src="/engine.js"></script></head><body><canvas id="canvas"></canvas></body></html>';
+  await buildStaticVercel({
+    fetchImpl: async () => new Response(source, { status: 200 }),
+    outputDir: path.join(directory, 'public'),
+    fallbackFile: path.join(directory, 'missing-fallback.html'),
+  });
+  const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
+  const runtime = await readFile(path.join(directory, 'public', 'runtime.html'), 'utf8');
+  const bundle = await readFile(path.join(directory, 'public', 'bt3-arena-bundle.js'), 'utf8');
+  const admin = await readFile(path.join(directory, 'public', 'admin.html'), 'utf8');
+  assert.equal(index, runtime);
+  assert.ok(index.indexOf('<script src="/bt3-arena-bundle.js"></script>') < index.indexOf('<script src="/engine.js">'));
+  assert.ok(bundle.length > 1000);
+  assert.match(admin, /Market Arena/);
+});
+
+test('la build Vercel usa il fallback HTML locale se upstream è offline', async (t) => {
+  const directory = await workspace(t);
+  const fallbackFile = path.join(directory, 'runtime-fallback.html');
+  const fallback = '<!doctype html><html><head></head><body><canvas id="canvas"></canvas></body></html>';
+  await writeFile(fallbackFile, fallback);
+  const result = await buildStaticVercel({
+    fetchImpl: async () => { throw new Error('offline'); },
+    outputDir: path.join(directory, 'public'),
+    fallbackFile,
+  });
+  const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
+  assert.equal(result.source, 'fallback');
+  assert.match(index, /<canvas id="canvas">/);
+  assert.match(index, /<script src="\/bt3-arena-bundle\.js"><\/script>/);
+});

@@ -68,9 +68,11 @@ Il pannello F2 della web app usa lo stesso endpoint: prima salva lo stato sul se
 
 ### Deploy su Vercel
 
-Il repository include `api/index.mjs`, che esporta lo stesso `http.Server` del proxy come Function Node.js, e `vercel.json`, che instrada ogni richiesta verso `/api/index.mjs`. Importa la repository GitHub in Vercel con framework **Other** e configura `ADMIN_KEY`; `UPSTREAM_ORIGIN` è opzionale. Non serve uno Start Command e non impostare `STATE_FILE`.
+La build `npm run build` scarica il runtime reale, compila il bundle web e genera `public/index.html`, `public/runtime.html`, `public/bt3-arena-bundle.js` e `public/admin.html`. Se upstream è offline usa `templates/runtime.fallback.html`. La home e il runtime sono quindi serviti dal CDN statico e non invocano alcuna Function.
 
-Su Vercel il filesystem e la memoria sono effimeri e le richieste possono raggiungere istanze differenti: lo stato CA e gli aggiornamenti SSE sono quindi limitati alla singola istanza e possono essere persi a restart/redeploy. Per sincronizzazione globale affidabile serve uno storage/pub-sub esterno; in alternativa usa Render/Railway con volume. Vercel ospita soltanto la web app, non il container Chromium/FFmpeg 24/7.
+`vercel.json` pubblica `public/`, instrada soltanto `/api/state` e `/api/events` alla Function isolata `api/state.mjs`, e usa rewrite esterni nativi per tutti gli asset del motore, inclusi quelli oltre 4,5 MB. Importa la repository con framework **Other** e configura `ADMIN_KEY`; non impostare `STATE_FILE`.
+
+Su Vercel la memoria è effimera e le richieste possono raggiungere istanze differenti: lo stato CA e gli aggiornamenti SSE possono quindi essere persi o non coincidere fra istanze. Per sincronizzazione globale affidabile serve uno storage/pub-sub esterno; in alternativa usa Render/Railway con volume. Vercel ospita soltanto la web app, non il container Chromium/FFmpeg 24/7.
 
 ### Deploy su Render
 

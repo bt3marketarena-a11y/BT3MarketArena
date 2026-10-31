@@ -1,18 +1,16 @@
 {
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
   "rewrites": [
-    { "source": "/:path*.wasm", "destination": "https://dragonballbt3.online/:path*.wasm" },
-    { "source": "/:path*.data", "destination": "https://dragonballbt3.online/:path*.data" },
-    { "source": "/:path*.bin", "destination": "https://dragonballbt3.online/:path*.bin" },
-    { "source": "/:path*.pak", "destination": "https://dragonballbt3.online/:path*.pak" },
-    { "source": "/:path*.mp3", "destination": "https://dragonballbt3.online/:path*.mp3" },
-    { "source": "/:path*.ogg", "destination": "https://dragonballbt3.online/:path*.ogg" },
-    { "source": "/:path*.png", "destination": "https://dragonballbt3.online/:path*.png" },
-    { "source": "/(.*)", "destination": "/api/index.mjs" }
+    { "source": "/api/state", "destination": "/api/state.mjs" },
+    { "source": "/api/events", "destination": "/api/state.mjs?events=1" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/:path((?!index\\.html|runtime\\.html|admin\\.html|bt3-arena-bundle\\.js|api/).*)", "destination": "https://dragonballbt3.online/:path" }
   ],
   "functions": {
-    "api/index.mjs": {
-      "maxDuration": 300,
-      "includeFiles": "{*.js,*.mjs,*.html,*.css}"
+    "api/state.mjs": {
+      "maxDuration": 300
     }
   }
 }

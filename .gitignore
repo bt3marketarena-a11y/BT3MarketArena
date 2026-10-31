@@ -4,3 +4,4 @@ artifacts/
 playwright-report/
 test-results/
 .vercel/
+public/

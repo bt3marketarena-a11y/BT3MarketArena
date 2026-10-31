@@ -6,10 +6,10 @@ import { readFile } from 'node:fs/promises';
 import { once } from 'node:events';
 
 async function importHandler() {
-  return (await import(`../api/index.mjs?test=${Date.now()}`)).default;
+  return (await import(`../api/state.mjs?test=${Date.now()}`)).default;
 }
 
-test('Vercel espone un handler HTTP che non avvia listener né scrive sul disco', async (t) => {
+test('la Function API Vercel non avvia listener né scrive sul disco', async (t) => {
   const previous = { vercel: process.env.VERCEL, stateFile: process.env.STATE_FILE, adminKey: process.env.ADMIN_KEY };
   process.env.VERCEL = '1';
   process.env.STATE_FILE = 'artifacts/vercel-forbidden/cloud-state.json';
@@ -27,9 +27,9 @@ test('Vercel espone un handler HTTP che non avvia listener né scrive sul disco'
     if (previous.adminKey === undefined) delete process.env.ADMIN_KEY; else process.env.ADMIN_KEY = previous.adminKey;
   });
   const base = `http://127.0.0.1:${server.address().port}`;
-  const health = await fetch(`${base}/healthz`);
-  assert.equal(health.status, 200);
-  assert.deepEqual(await health.json(), { ok: true });
+  const state = await fetch(`${base}/api/state`);
+  assert.equal(state.status, 200);
+  assert.equal((await state.json()).source, 'simulation');
   const mutation = await fetch(`${base}/api/state`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-admin-key' },
@@ -39,7 +39,7 @@ test('Vercel espone un handler HTTP che non avvia listener né scrive sul disco'
   assert.equal(existsSync(process.env.STATE_FILE), false);
 });
 
-test('Vercel restituisce errori dell’handler come JSON diagnostico', async () => {
+test('la Function API restituisce errori come JSON diagnostico', async () => {
   const handler = await importHandler();
   const response = {
     headersSent: false,
@@ -50,27 +50,19 @@ test('Vercel restituisce errori dell’handler come JSON diagnostico', async () 
   assert.equal(response.status, 500);
   const error = JSON.parse(response.body);
   assert.match(error.error, /Invalid URL/);
-  assert.match(error.stack, /server\.mjs/);
+  assert.match(error.stack, /state\.mjs/);
 });
 
-test('il cold boot Vercel carica server e bundler soltanto dentro al handler protetto', async () => {
-  const api = await readFile(new URL('../api/index.mjs', import.meta.url), 'utf8');
-  const server = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(api, /^import \{ createArenaServer \}/m);
-  assert.match(api, /import\('\.\.\/server\.mjs'\)/);
-  assert.doesNotMatch(server, /^import \{ createInjectionBundle \}/m);
-  assert.match(server, /import\('\.\/injectionBundle\.mjs'\)/);
-});
-
-test('Vercel esternalizza gli asset pesanti, include i file runtime e ignora artefatti locali', async () => {
+test('Vercel serve il gioco dal CDN statico e usa rewrite nativi per gli asset', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-  assert.deepEqual(config.rewrites.at(-1), { source: '/(.*)', destination: '/api/index.mjs' });
-  for (const extension of ['wasm', 'data', 'bin', 'pak', 'mp3', 'ogg', 'png']) {
-    const rewrite = config.rewrites.find((item) => item.source === `/:path*.${extension}`);
-    assert.deepEqual(rewrite, { source: `/:path*.${extension}`, destination: `https://dragonballbt3.online/:path*.${extension}` });
-  }
-  assert.equal(config.functions['api/index.mjs'].maxDuration, 300);
-  assert.equal(config.functions['api/index.mjs'].includeFiles, '{*.js,*.mjs,*.html,*.css}');
+  assert.equal(config.version, 2);
+  assert.equal(config.buildCommand, 'npm run build');
+  assert.equal(config.outputDirectory, 'public');
+  assert.ok(config.rewrites.some((item) => item.source === '/api/state' && item.destination === '/api/state.mjs'));
+  assert.ok(config.rewrites.some((item) => item.source === '/admin' && item.destination === '/admin.html'));
+  assert.equal(config.rewrites.at(-1).destination, 'https://dragonballbt3.online/:path');
+  assert.equal(config.rewrites.some((item) => item.destination === '/api/index.mjs'), false);
+  assert.equal(config.rewrites.some((item) => item.source === '/(.*)'), false);
   const ignore = await readFile(new URL('../.gitignore', import.meta.url), 'utf8');
   assert.match(ignore, /^node_modules\/$/m);
   assert.match(ignore, /^artifacts\/$/m);
