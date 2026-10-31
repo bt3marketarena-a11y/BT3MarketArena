@@ -5,15 +5,20 @@ import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHud
 
 function frame() {
   const png = new PNG({ width: 1920, height: 1080 });
-  png.data.fill(0);
-  for (let index = 3; index < png.data.length; index += 4) png.data[index] = 255;
+  // Frame landscape senza letterbox: il contenuto inizia dal primo pixel.
+  for (let index = 0; index < png.data.length; index += 4) {
+    png.data[index] = 10;
+    png.data[index + 1] = 15;
+    png.data[index + 2] = 25;
+    png.data[index + 3] = 255;
+  }
   return png;
 }
 
 function greenBars(png, rightToo = true) {
   const bars = rightToo ? [[330, 800], [1120, 1590]] : [[330, 800]];
   for (const [x0, x1] of bars) {
-    for (let y = 110; y < 134; y += 1) {
+    for (let y = 35; y < 55; y += 1) {
       for (let x = x0; x < x1; x += 1) {
         const offset = (y * png.width + x) * 4;
         png.data[offset] = 40;
@@ -40,7 +45,7 @@ test('l’introduzione o una sola barra non avvia il timer di combattimento', ()
 
 test('il timer centrale mantiene attivo il match anche con HP consumate', () => {
   const png = frame();
-  for (let y = 110; y < 140; y += 1) {
+  for (let y = 35; y < 70; y += 1) {
     for (let x = 925; x < 990; x += 1) {
       const offset = (y * png.width + x) * 4;
       png.data[offset] = 240;
@@ -72,7 +77,7 @@ test('legge HP verdi, gialle e rosse senza confondere una barra vuota', () => {
   greenBars(oneBar, false);
   assert.deepEqual(readCombatHealth(oneBar), { p1: true, p2: false });
   for (const [red, green, blue] of [[220, 190, 30], [210, 45, 30]]) {
-    for (let y = 110; y < 134; y += 1) {
+    for (let y = 35; y < 55; y += 1) {
       for (let x = 1120; x < 1250; x += 1) {
         const offset = (y * oneBar.width + x) * 4;
         oneBar.data[offset] = red;

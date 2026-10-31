@@ -55,11 +55,25 @@ export function hasCombatHudFrame(png) {
   return greenSamples(0.17, 0.43) > 8 && greenSamples(0.57, 0.83) > 8;
 }
 
+function hasTopLetterbox(png) {
+  let samples = 0;
+  let visible = 0;
+  for (let y = 0; y < Math.ceil(png.height * 0.025); y += 2) {
+    for (let x = Math.floor(png.width * 0.34); x < Math.ceil(png.width * 0.66); x += 8) {
+      const offset = (y * png.width + x) * 4;
+      if (Math.max(png.data[offset], png.data[offset + 1], png.data[offset + 2]) > 20) visible += 1;
+      samples += 1;
+    }
+  }
+  return samples > 0 && visible / samples < 0.05;
+}
+
 /** Il timer resta visibile con HP gialle/rosse e durante la pausa. */
 export function hasActiveCombatFrame(png) {
   let timerPixels = 0;
-  // Nel frame RGBA 960x540 del runtime il timer occupa circa y=55–70.
-  for (let y = Math.floor(png.height * 0.095); y < Math.ceil(png.height * 0.135); y += 3) {
+  // Senza letterbox il timer è in alto; con banda nera è traslato in basso.
+  const [minY, maxY] = hasTopLetterbox(png) ? [0.095, 0.135] : [0.025, 0.085];
+  for (let y = Math.floor(png.height * minY); y < Math.ceil(png.height * maxY); y += 3) {
     for (let x = Math.floor(png.width * 0.475); x < Math.ceil(png.width * 0.525); x += 4) {
       const offset = (y * png.width + x) * 4;
       const red = png.data[offset];
@@ -97,11 +111,12 @@ export class CombatEndDetector {
 }
 
 export function readCombatHealth(png) {
+  // Limita la lettura alla fascia HP del layout corrente: le aure altre non
+  // devono trasformare una barra vuota in una HP presente.
+  const [minY, maxY] = hasTopLetterbox(png) ? [0.095, 0.13] : [0.025, 0.075];
   const hasHealth = (minX, maxX) => {
     let count = 0;
-    // Limita la lettura alle HP reali (circa y=55–66 a 540p): le aure più
-    // in alto non devono trasformare una barra vuota in una HP presente.
-    for (let y = Math.floor(png.height * 0.095); y < Math.ceil(png.height * 0.13); y += 4) {
+    for (let y = Math.floor(png.height * minY); y < Math.ceil(png.height * maxY); y += 4) {
       for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 8) {
         const offset = (y * png.width + x) * 4;
         const red = png.data[offset];
