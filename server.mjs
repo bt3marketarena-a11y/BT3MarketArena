@@ -74,7 +74,7 @@ export function createArenaServer({
   fetchImpl = globalThis.fetch,
   bundle = null,
   adminKey = process.env.ADMIN_KEY ?? '',
-  stateFile = process.env.STATE_FILE === undefined ? path.join(process.cwd(), 'artifacts', 'cloud-state.json') : process.env.STATE_FILE || null,
+  stateFile = process.env.VERCEL ? null : process.env.STATE_FILE === undefined ? path.join(process.cwd(), 'artifacts', 'cloud-state.json') : process.env.STATE_FILE || null,
 } = {}) {
   const upstream = new URL(upstreamOrigin);
   if (!['http:', 'https:'].includes(upstream.protocol) || upstream.username || upstream.password) throw new Error('UPSTREAM_ORIGIN non valido.');
@@ -217,7 +217,7 @@ export function resolveListenOptions(args = process.argv.slice(2), env = process
   return { host, port };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const { host, port } = resolveListenOptions();
   const server = createArenaServer();
   server.listen(port, host, () => console.log(`[BT3 cloud] Web app e admin disponibili sulla porta ${port}`));

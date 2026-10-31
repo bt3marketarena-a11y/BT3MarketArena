@@ -1,13 +1,18 @@
 {
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index.mjs"
-    }
+    { "source": "/:path*.wasm", "destination": "https://dragonballbt3.online/:path*.wasm" },
+    { "source": "/:path*.data", "destination": "https://dragonballbt3.online/:path*.data" },
+    { "source": "/:path*.bin", "destination": "https://dragonballbt3.online/:path*.bin" },
+    { "source": "/:path*.pak", "destination": "https://dragonballbt3.online/:path*.pak" },
+    { "source": "/:path*.mp3", "destination": "https://dragonballbt3.online/:path*.mp3" },
+    { "source": "/:path*.ogg", "destination": "https://dragonballbt3.online/:path*.ogg" },
+    { "source": "/:path*.png", "destination": "https://dragonballbt3.online/:path*.png" },
+    { "source": "/(.*)", "destination": "/api/index.mjs" }
   ],
   "functions": {
     "api/index.mjs": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "{*.js,*.mjs,*.html,*.css}"
     }
   }
 }
