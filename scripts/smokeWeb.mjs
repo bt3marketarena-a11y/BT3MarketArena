@@ -1,0 +1,82 @@
+import { chromium } from 'playwright';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { createArenaServer } from '../server.mjs';
+import { findChromeExecutable } from '../launcher.mjs';
+
+const full = process.argv.includes('--full');
+const server = createArenaServer({ adminKey: 'smoke-only-not-retained', stateFile: null });
+let browser;
+try {
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const executablePath = findChromeExecutable();
+  browser = await chromium.launch({
+    headless: process.env.BT3_SMOKE_HEADFUL !== '1',
+    ...(executablePath ? { executablePath } : {}),
+    args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'],
+  });
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  if (process.env.BT3_SMOKE_SINGLE_CHANNEL === '1') {
+    await page.addInitScript(() => {
+      const NativeKeyboardEvent = window.KeyboardEvent;
+      window.KeyboardEvent = class extends NativeKeyboardEvent {
+        constructor(type, init) { super(type, { ...init, bubbles: true }); }
+      };
+      const originalDispatch = window.dispatchEvent;
+      window.dispatchEvent = function dispatchOnce(event) {
+        if (event instanceof NativeKeyboardEvent && !event.isTrusted) return true;
+        return originalDispatch.call(this, event);
+      };
+    });
+  }
+  const errors = [];
+  let waitError = null;
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.text().startsWith('[BT3')) console.log(`[browser] ${message.text()}`);
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.goto(`${base}/runtime.html?hud=0&embedded=0&lang=it&env=BT3_SCALE%3D1%2CBT3_INTERP%3D0`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+  await page.waitForFunction(() => window.__BT3_MARKET_ARENA__?.status === 'running', null, { timeout: 60_000 });
+  await page.waitForFunction(() => document.querySelector('canvas') && window.__BT3_FRAME_CAPTURE__, null, { timeout: 60_000 });
+  if (full) {
+    await page.waitForFunction(() => window.__BT3_MARKET_ARENA__?.menuSequence === 'completed' || window.__BT3_MARKET_ARENA__?.automationError, null, { timeout: Number(process.env.BT3_SMOKE_TIMEOUT) || 240_000 }).catch((error) => { waitError = error; });
+  } else {
+    await page.waitForTimeout(12_000);
+  }
+  const diagnostics = await page.evaluate(() => ({
+    status: window.__BT3_MARKET_ARENA__?.status,
+    injectionError: window.__BT3_MARKET_ARENA__?.error,
+    automationError: window.__BT3_MARKET_ARENA__?.automationError,
+    menuSequence: window.__BT3_MARKET_ARENA__?.menuSequence,
+    phase: window.marketArena?.match?.phase,
+    hud: Boolean(document.getElementById('broadcast')),
+    canvases: document.querySelectorAll('canvas').length,
+    pads: [...navigator.getGamepads()].map((pad) => pad && ({ index: pad.index, buttons: pad.buttons.length, axes: pad.axes.length })),
+    frame: (() => {
+      const frame = window.__BT3_FRAME_CAPTURE__?.read();
+      return frame ? { width: frame.width, height: frame.height, bytes: frame.data.length } : null;
+    })(),
+  }));
+  const dataUrl = await page.evaluate(() => {
+    const frame = window.__BT3_FRAME_CAPTURE__.read();
+    const canvas = document.createElement('canvas');
+    canvas.width = frame.width;
+    canvas.height = frame.height;
+    canvas.getContext('2d').putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
+    return canvas.toDataURL('image/png');
+  });
+  await mkdir(path.join(process.cwd(), 'artifacts'), { recursive: true });
+  await writeFile(path.join(process.cwd(), 'artifacts', full ? 'cloud-web-combat.png' : 'cloud-web-smoke.png'), Buffer.from(dataUrl.split(',')[1], 'base64'));
+  console.log(JSON.stringify({ diagnostics, errors: errors.slice(0, 20) }, null, 2));
+  if (diagnostics.automationError) throw new Error(diagnostics.automationError);
+  if (diagnostics.pads.length !== 2 || diagnostics.pads.some((pad) => !pad || pad.buttons !== 16 || pad.axes !== 4)) throw new Error('Gamepad web non conformi.');
+  if (!diagnostics.hud || !diagnostics.frame) throw new Error('HUD o cattura RGBA non disponibili.');
+  if (waitError) throw waitError;
+  if (full && diagnostics.menuSequence !== 'completed') throw new Error('Automazione web non completata.');
+} finally {
+  await browser?.close();
+  server.closeAllConnections();
+  await new Promise((resolve) => server.close(resolve));
+}
