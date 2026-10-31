@@ -58,7 +58,8 @@ export function hasCombatHudFrame(png) {
 /** Il timer resta visibile con HP gialle/rosse e durante la pausa. */
 export function hasActiveCombatFrame(png) {
   let timerPixels = 0;
-  for (let y = Math.floor(png.height * 0.025); y < Math.ceil(png.height * 0.085); y += 3) {
+  // Nel frame RGBA 960x540 del runtime il timer occupa circa y=55–70.
+  for (let y = Math.floor(png.height * 0.095); y < Math.ceil(png.height * 0.135); y += 3) {
     for (let x = Math.floor(png.width * 0.475); x < Math.ceil(png.width * 0.525); x += 4) {
       const offset = (y * png.width + x) * 4;
       const red = png.data[offset];
@@ -98,7 +99,9 @@ export class CombatEndDetector {
 export function readCombatHealth(png) {
   const hasHealth = (minX, maxX) => {
     let count = 0;
-    for (let y = Math.floor(png.height * 0.025); y < Math.ceil(png.height * 0.075); y += 4) {
+    // Limita la lettura alle HP reali (circa y=55–66 a 540p): le aure più
+    // in alto non devono trasformare una barra vuota in una HP presente.
+    for (let y = Math.floor(png.height * 0.095); y < Math.ceil(png.height * 0.13); y += 4) {
       for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 8) {
         const offset = (y * png.width + x) * 4;
         const red = png.data[offset];
