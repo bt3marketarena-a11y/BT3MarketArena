@@ -52,7 +52,7 @@ Il bootstrap web installa:
 - un adapter browser per lo stesso `menuDriver.mjs`;
 - eventi menu singoli con bubbling naturale dal canvas a `window`, equivalenti agli input Playwright;
 - hook `requestAnimationFrame` e `preserveDrawingBuffer` per leggere RGBA/HP dal vero canvas WebGL2;
-- lo stesso monitor KO, timer assente e cambio personaggi usato dal launcher.
+- lo stesso monitor HP/KO e cambio personaggi usato dal launcher: il timer assente sospende soltanto gli input, senza dichiarare la fine del match.
 
 Per il rendering 3D è necessario un browser con WebGL2 accelerato. Il percorso completo è stato verificato in Chromium headful; Chromium headless può mostrare un canvas nero durante il caricamento 3D e non è una prova valida del rendering per gli spettatori.
 
@@ -151,7 +151,7 @@ Su Render/Railway scegli il deploy **Dockerfile**, espone la porta HTTP e config
 8. Entra in **Duel → 1P vs 2P → Single Battle**.
 9. Randomizza P1 con frecce + `K`, P2 con il secondo gamepad virtuale; conferma per entrambi personaggio, **Custom Select → Normal** e colore.
 10. Randomizza e conferma la mappa, attende il download degli asset e la comparsa del frame 3D a colori, poi supera l'intro con Start e attiva i due pad in combattimento.
-11. Su Windows cattura il desktop reale in modalità DPI-aware, evitando frame WebGL obsoleti e ritagli dovuti allo scaling. Se una barra HP resta vuota per **1,5 s**, ferma subito i pad prima di Rematch; se il timer sparisce, sospende gli input dopo **2 s** e conferma la fine match dopo **12 s**. Preme **ArrowDown → K** per scegliere **Character Select** e riesegue dal punto 9 un roster e una mappa realmente nuovi. Il timer software di **300 s** è soltanto un fallback, successivo al normale contatore BT3 da 240 s.
+11. Su Windows cattura il desktop reale in modalità DPI-aware, evitando frame WebGL obsoleti e ritagli dovuti allo scaling. Con una barra HP presente e l'altra vuota per **1,5 s**, ferma subito i pad prima di Rematch e dichiara il KO. Se il timer sparisce, sospende gli input dopo **2 s** senza confondere i menu di pausa con il risultato; alla ricomparsa riprende il combattimento. Dopo un KO reale preme **ArrowDown → K** per scegliere **Character Select** e riesegue dal punto 9 un roster e una mappa realmente nuovi. Il timeout software è disattivato per default (`roundDurationSec = 0`); un valore positivo lo abilita come opzione.
 
 Questo passaggio attraverso il runtime reale evita sia il blocco cross-origin sia l'annidamento nel frame della landing: hook, HUD, input e Wasm condividono lo stesso `window`.
 
@@ -187,9 +187,9 @@ Gli eventi sintetici hanno `isTrusted=false`; il gamepad polling resta il canale
 
 ### Macro di combattimento
 
-Scheduler a 60 fps con `zCounterLoop`, `rushCombo`, `blast2`, `ultimateFinal` e `sidestep`. Durante il combattimento entrambi i pad ricevono un impulso **L1 ogni 300 frame (circa 5 s)** per riattivare il lock-on; in `idle` il pulsante viene rilasciato. La vecchia macro `enterDuelMode()` non viene più invocata: i menu appartengono esclusivamente a `menuDriver.mjs`.
+Scheduler a 60 fps con `zCounterLoop`, `rushCombo`, `blast2`, `ultimateFinal`, `sidestep` e `teleportCounter`. La coreografia predefinita `cinematicLoop` alterna counter, rush, teletrasporto, schivata laterale e Blast 2. Durante il combattimento entrambi i pad ricevono un impulso **L1 ogni 300 frame (circa 5 s)** per riattivare il lock-on; in `idle` il pulsante viene rilasciato. La vecchia macro `enterDuelMode()` non viene più invocata: i menu appartengono esclusivamente a `menuDriver.mjs`.
 
-BUY attiva l'attacco di P1 e rende vulnerabile P2; SELL inverte i ruoli. Una whale avvia `L2 + Su + Circle`. Al termine dell'override i pad tornano allo stato neutro.
+BUY attiva l'attacco di P1 e rende vulnerabile P2; SELL inverte i ruoli. Una whale avvia `L2 + Su + Circle`. Al termine dell'override i pad tornano alla coreografia neutra. `setCinematicCombat(false)` disattiva a caldo la coreografia senza reinstallare i controller.
 
 ## HUD e Admin
 
@@ -197,12 +197,22 @@ Il canvas reale è forzato a `100vw × 100vh` con `object-fit: contain`. L'HUD �
 
 - Buy/Sell Dominance su finestra rolling di 15 secondi.
 - Market cap e prezzo.
-- Live Impact Feed associato agli input.
+- Live Impact Feed interamente in inglese, chiuso per default e apribile a tendina tramite il suo toggle; soltanto il pulsante intercetta il mouse.
 - Contract Address e sorgente feed.
 - Round, fase e banner K.O.
 - HP soltanto quando il Wasm Memory Bridge è configurato; non vengono mostrati valori simulati.
 
-Premi **F2** per aprire il Control Room in un popup separato, fuori dalla cattura OBS. Consente hot-swap del CA, selezione feed, whale threshold, RPC, offset memoria e test BUY/SELL/WHALE. Il cambio feed non ricarica il runtime o il bridge.
+Premi **F2** per aprire il Control Room in un popup separato, fuori dalla cattura OBS. Consente hot-swap del CA, selezione feed, whale threshold, RPC, offset memoria e test BUY/SELL/WHALE. Il timeout del round è opzionale: `0` significa soltanto KO. Quattro checkbox attivano/disattivano a caldo `autoMenu`, `autoRematch`, `cinematicCombat` e `visualKO`. Il cambio feed non ricarica il runtime o il bridge.
+
+Gli stessi flag e lo stato delle validazioni visive sono disponibili dalla console:
+
+```js
+marketArena.setFeature('cinematicCombat', false);
+marketArena.setFeature('visualKO', true);
+marketArena.getVisualValidation();
+```
+
+I flag accettano soltanto valori booleani. `getVisualValidation()` espone fase, round, stato dei flag e ultimo frame acquisito; una fase logica non sostituisce il controllo visivo del canvas.
 
 ## Feed di mercato
 
@@ -221,7 +231,7 @@ Nel pannello F2 inserisci offset decimali per fase, HP P1 e HP P2. L'adapter leg
 2. `window.Module.wasmMemory`
 3. `window.Module.HEAPU8.buffer`
 
-HP sono `Int16LE`, fase `Uint8`, con scala HUD predefinita 0–1000. Senza offset, gli HP restano nascosti e il cambio round usa il timer di sicurezza. Gli aggiornamenti del sito possono cambiare la memoria e richiedere una nuova identificazione degli offset.
+HP sono `Int16LE`, fase `Uint8`, con scala HUD predefinita 0–1000. Senza offset, gli HP restano nascosti e il cambio round usa il rilevamento visivo del KO; il timer assente sospende soltanto gli input. Gli aggiornamenti del sito possono cambiare la memoria e richiedere una nuova identificazione degli offset.
 
 ## OBS
 
