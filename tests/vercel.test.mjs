@@ -53,16 +53,20 @@ test('la Function API restituisce errori come JSON diagnostico', async () => {
   assert.match(error.stack, /state\.mjs/);
 });
 
-test('Vercel serve il gioco dal CDN statico e usa rewrite nativi per gli asset', async () => {
+test('Vercel forza il routing statico e conserva soltanto la Function state', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-  assert.equal(config.version, 2);
-  assert.equal(config.buildCommand, 'npm run build');
-  assert.equal(config.outputDirectory, 'public');
-  assert.ok(config.rewrites.some((item) => item.source === '/api/state' && item.destination === '/api/state.mjs'));
-  assert.ok(config.rewrites.some((item) => item.source === '/admin' && item.destination === '/admin.html'));
-  assert.equal(config.rewrites.at(-1).destination, 'https://dragonballbt3.online/:path');
-  assert.equal(config.rewrites.some((item) => item.destination === '/api/index.mjs'), false);
-  assert.equal(config.rewrites.some((item) => item.source === '/(.*)'), false);
+  assert.deepEqual(config, {
+    version: 2,
+    buildCommand: 'npm run build',
+    outputDirectory: 'public',
+    rewrites: [
+      { source: '/api/(.*)', destination: '/api/$1' },
+      { source: '/admin', destination: '/admin.html' },
+      { source: '/(.*)', destination: '/index.html' },
+    ],
+  });
+  assert.equal(existsSync(new URL('../api/state.mjs', import.meta.url)), true);
+  assert.equal(existsSync(new URL('../api/index.mjs', import.meta.url)), false);
   const ignore = await readFile(new URL('../.gitignore', import.meta.url), 'utf8');
   assert.match(ignore, /^node_modules\/$/m);
   assert.match(ignore, /^artifacts\/$/m);

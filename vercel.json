@@ -3,14 +3,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/state", "destination": "/api/state.mjs" },
-    { "source": "/api/events", "destination": "/api/state.mjs?events=1" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/:path((?!index\\.html|runtime\\.html|admin\\.html|bt3-arena-bundle\\.js|api/).*)", "destination": "https://dragonballbt3.online/:path" }
-  ],
-  "functions": {
-    "api/state.mjs": {
-      "maxDuration": 300
-    }
-  }
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
