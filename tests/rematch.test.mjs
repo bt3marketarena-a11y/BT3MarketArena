@@ -75,6 +75,10 @@ test('dopo il menu visibile P2 preme giù e Cross, senza tastiera né Rematch an
       events.push(`capture:${captures}`);
       const frameIndex = Math.min(captures++, frames.length - 1);
       const moved = buttons.some(([player, button, pressed]) => player === 1 && button === 'down' && !pressed);
+      const confirmed = buttons.some(([player, button, pressed]) =>
+        player === 1 && button === 'cross' && !pressed
+      );
+      if (frameIndex >= 2 && confirmed) return PNG.sync.write(menuFrame(false));
       return PNG.sync.write(frameIndex < 2 ? frames[frameIndex] : menuFrame(true, moved ? 1 : 0));
     },
     waitForTimeout: async () => {},

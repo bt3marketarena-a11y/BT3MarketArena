@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import {
   hasResultsMenuFrame,
+  readExitPromptSelection,
   readResultsMenuSelection,
   runRematchSequence,
   waitForResultsMenu,
@@ -33,12 +34,12 @@ function resultsFrame(selected = 1) {
   return png;
 }
 
-function exitFrame() {
+function exitFrame(selected = 1) {
   const png = new PNG({ width: 960, height: 540 });
   paint(png, 0, 0, 960, 540, [35, 130, 55]);
   paint(png, 300, 195, 660, 340, [12, 35, 55]);
-  paint(png, 440, 270, 520, 282, [220, 225, 230]);
-  paint(png, 440, 302, 520, 314, [230, 220, 40]);
+  paint(png, 440, 270, 520, 282, selected === 0 ? [230, 220, 40] : [220, 225, 230]);
+  paint(png, 440, 302, 520, 314, selected === 1 ? [230, 220, 40] : [220, 225, 230]);
   return png;
 }
 
@@ -85,10 +86,11 @@ test('la selezione Character Select viene letta senza assumere Fight Again', () 
 });
 
 test('EXIT viene chiuso su No prima di leggere il menu risultati', async () => {
-  const frames = [exitFrame(), resultsFrame(1)];
-  let captures = 0;
   const events = [];
-  const { page, restore } = fakePage(async () => PNG.sync.write(frames[Math.min(captures++, frames.length - 1)]), events);
+  const { page, restore } = fakePage(async () => {
+    const closed = events.some((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]);
+    return PNG.sync.write(closed ? resultsFrame(1) : exitFrame(1));
+  }, events);
   try {
     const selected = await waitForResultsMenu(page, { menuPlayer: 1, timeoutMs: 5_000, pollMs: 0 });
     assert.equal(selected, 1);
@@ -104,6 +106,12 @@ test('da Return to Main Menu il driver sale a Character Select con impulsi brevi
   const events = [];
   const { page, restore } = fakePage(async () => {
     const ups = events.filter((event) => event.type === 'button' && event.args[1] === 'up' && !event.args[2]).length;
+    const confirmed = events.some((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]);
+    if (confirmed) {
+      const png = new PNG({ width: 960, height: 540 });
+      paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      return PNG.sync.write(png);
+    }
     return PNG.sync.write(resultsFrame(ups >= 2 ? 1 : 3));
   }, events);
   try {
@@ -124,6 +132,35 @@ test('da Return to Main Menu il driver sale a Character Select con impulsi brevi
     const lastUp = events.findLastIndex((event) => event.type === 'button' && event.args[1] === 'up');
     const cross = events.findIndex((event) => event.type === 'button' && event.args[1] === 'cross');
     assert.ok(cross > lastUp);
+  } finally {
+    restore();
+  }
+});
+
+test('il pannello EXIT distingue Yes da No', () => {
+  assert.equal(readExitPromptSelection(exitFrame(0)), 0);
+  assert.equal(readExitPromptSelection(exitFrame(1)), 1);
+  assert.equal(readExitPromptSelection(resultsFrame(1)), null);
+});
+
+test('dopo Character Select il driver sceglie Yes su EXIT prima del roster', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const confirmations = events.filter((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]).length;
+    const movedToYes = events.some((event) => event.type === 'button' && event.args[1] === 'up' && !event.args[2]);
+    return PNG.sync.write(confirmations === 0 ? resultsFrame(1) : exitFrame(movedToYes ? 0 : 1));
+  }, events);
+  try {
+    await runRematchSequence(page, {
+      menuPlayer: 1,
+      rosterSequence: async () => ({ verified: true }),
+    });
+    const buttons = events.filter((event) => event.type === 'button').map((event) => event.args);
+    assert.deepEqual(buttons, [
+      [1, 'cross', true], [1, 'cross', false],
+      [1, 'up', true], [1, 'up', false],
+      [1, 'cross', true], [1, 'cross', false],
+    ]);
   } finally {
     restore();
   }

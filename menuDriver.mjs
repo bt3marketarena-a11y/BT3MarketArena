@@ -144,37 +144,59 @@ export function hasExitPromptFrame(png) {
   return darkRatio > 0.2 && brightText > 24 && center > 0.4 && left < 0.15 && right < 0.15;
 }
 
+function yellowTextCount(png, center) {
+  const scaledCenter = center * png.height / 540;
+  let yellow = 0;
+  for (let y = Math.floor(scaledCenter - 9 * png.height / 540); y <= Math.ceil(scaledCenter + 9 * png.height / 540); y += 2) {
+    for (let x = Math.floor(png.width * 0.2); x < Math.ceil(png.width * 0.8); x += 3) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blue = png.data[offset + 2];
+      if (red > 140 && green > 100 && blue < 120 && red > blue * 1.6 && green > blue * 1.3) yellow += 1;
+    }
+  }
+  return yellow;
+}
+
 export function readResultsMenuSelection(png) {
   if (!hasResultsMenuFrame(png)) return null;
-  const centers = [225, 252, 284, 311, 342, 371];
-  const counts = centers.map((center) => {
-    const scaledCenter = center * png.height / 540;
-    let yellow = 0;
-    for (let y = Math.floor(scaledCenter - 9 * png.height / 540); y <= Math.ceil(scaledCenter + 9 * png.height / 540); y += 2) {
-      for (let x = Math.floor(png.width * 0.2); x < Math.ceil(png.width * 0.8); x += 3) {
-        const offset = (y * png.width + x) * 4;
-        const red = png.data[offset];
-        const green = png.data[offset + 1];
-        const blue = png.data[offset + 2];
-        if (red > 140 && green > 100 && blue < 120 && red > blue * 1.6 && green > blue * 1.3) yellow += 1;
-      }
-    }
-    return yellow;
-  });
+  const counts = [225, 252, 284, 311, 342, 371].map((center) => yellowTextCount(png, center));
   const selected = counts.indexOf(Math.max(...counts));
   return counts[selected] > 20 ? selected : null;
 }
 
-export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 500, menuPlayer = 1 } = {}) {
+export function readExitPromptSelection(png) {
+  if (!hasExitPromptFrame(png)) return null;
+  const counts = [280, 311].map((center) => yellowTextCount(png, center));
+  const selected = counts.indexOf(Math.max(...counts));
+  return counts[selected] > 20 ? selected : null;
+}
+
+async function confirmExitPromptSelection(page, menuPlayer, target) {
   const { tap, padTap } = createMenuControls(page, () => {});
+  const selected = readExitPromptSelection(PNG.sync.read(await page.screenshot()));
+  if (selected === null) throw new Error('Pannello EXIT non leggibile: nessuna conferma inviata.');
+  const delta = selected - target;
+  for (let index = 0; index < Math.abs(delta); index += 1) {
+    if (menuPlayer === 0) await tap(delta > 0 ? 'ArrowUp' : 'ArrowDown', 120);
+    else await padTap(delta > 0 ? 'up' : 'down', 120);
+    await wait(page, 350);
+  }
+  const verified = readExitPromptSelection(PNG.sync.read(await page.screenshot()));
+  if (verified !== target) throw new Error(`Voce EXIT ${target === 0 ? 'Yes' : 'No'} non verificata; conferma bloccata.`);
+  if (menuPlayer === 0) await tap('k', 400);
+  else await padTap('cross', 400);
+  await wait(page, 1_000);
+}
+
+export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 500, menuPlayer = 1 } = {}) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const png = PNG.sync.read(await page.screenshot());
     if (hasExitPromptFrame(png)) {
-      console.log('[BT3 menu] EXIT? rilevato: confermo No e torno al menu dei risultati');
-      if (menuPlayer === 0) await tap('k', 300);
-      else await padTap('cross', 300);
-      await wait(page, 1_000);
+      console.log('[BT3 menu] EXIT? residuo: confermo No e torno al menu dei risultati');
+      await confirmExitPromptSelection(page, menuPlayer, 1);
       continue;
     }
     const selected = readResultsMenuSelection(png);
@@ -396,6 +418,15 @@ export async function runRematchSequence(page, options = {}) {
   }
   if (menuPlayer === 0) await tap('k', 400);
   else await padTap('cross', 400);
+  await wait(page, 1_200);
+  const confirmationFrame = PNG.sync.read(await page.screenshot());
+  if (hasExitPromptFrame(confirmationFrame)) {
+    // Character Select chiede EXIT? con default No: qui Yes è la conferma corretta.
+    progress('conferma EXIT? → Yes per entrare davvero nel Character Select');
+    await confirmExitPromptSelection(page, menuPlayer, 0);
+  } else if (hasResultsMenuFrame(confirmationFrame)) {
+    throw new Error('Conferma Character Select non recepita: il menu risultati è ancora visibile.');
+  }
   await wait(page, 8_000);
   return rosterSequence(page, options);
 }
