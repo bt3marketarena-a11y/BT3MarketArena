@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createInjectionBundle } from './injectionBundle.mjs';
 import { CloudStateStore } from './cloudState.mjs';
 
 export const DEFAULT_UPSTREAM = 'https://dragonballbt3.online';
@@ -164,7 +163,7 @@ export function createArenaServer({
       const contentType = headers.get('content-type') ?? '';
       if (/\btext\/html\b/i.test(contentType)) {
         const html = new TextDecoder().decode(await upstreamResponse.arrayBuffer());
-        const injected = requestUrl.searchParams.get('inject') === '0' ? html : injectBundle(html, await (bundlePromise ??= createInjectionBundle({ web: true, cloudSync: { enabled: true } })));
+        const injected = requestUrl.searchParams.get('inject') === '0' ? html : injectBundle(html, await (bundlePromise ??= import('./injectionBundle.mjs').then(({ createInjectionBundle }) => createInjectionBundle({ web: true, cloudSync: { enabled: true } }))));
         for (const name of ['content-security-policy', 'content-security-policy-report-only', 'etag', 'content-md5']) headers.delete(name);
         headers.set('content-type', 'text/html; charset=utf-8');
         headers.set('cache-control', 'no-cache');

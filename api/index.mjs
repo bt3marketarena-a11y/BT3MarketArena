@@ -1,11 +1,17 @@
-import { createArenaServer } from '../server.mjs';
+let requestHandlerPromise;
 
-// Il filesystem serverless è effimero: niente stato su disco e niente listen().
-const arena = createArenaServer({ stateFile: null });
-const requestHandler = arena.listeners('request')[0];
+async function getRequestHandler() {
+  requestHandlerPromise ??= import('../server.mjs').then(({ createArenaServer }) => {
+    // Il filesystem serverless è effimero: niente stato su disco e niente listen().
+    const arena = createArenaServer({ stateFile: null });
+    return arena.listeners('request')[0];
+  });
+  return requestHandlerPromise;
+}
 
 export default async function handler(request, response) {
   try {
+    const requestHandler = await getRequestHandler();
     await requestHandler(request, response);
   } catch (error) {
     if (response.headersSent) {

@@ -53,6 +53,15 @@ test('Vercel restituisce errori dell’handler come JSON diagnostico', async () 
   assert.match(error.stack, /server\.mjs/);
 });
 
+test('il cold boot Vercel carica server e bundler soltanto dentro al handler protetto', async () => {
+  const api = await readFile(new URL('../api/index.mjs', import.meta.url), 'utf8');
+  const server = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(api, /^import \{ createArenaServer \}/m);
+  assert.match(api, /import\('\.\.\/server\.mjs'\)/);
+  assert.doesNotMatch(server, /^import \{ createInjectionBundle \}/m);
+  assert.match(server, /import\('\.\/injectionBundle\.mjs'\)/);
+});
+
 test('Vercel esternalizza gli asset pesanti, include i file runtime e ignora artefatti locali', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
   assert.deepEqual(config.rewrites.at(-1), { source: '/(.*)', destination: '/api/index.mjs' });
