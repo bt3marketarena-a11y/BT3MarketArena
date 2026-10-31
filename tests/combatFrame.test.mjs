@@ -111,6 +111,24 @@ test('gli effetti sopra le HP non sostituiscono le barre nel frame 960x540', () 
   assert.deepEqual(readCombatHealth(png), { p1: true, p2: true });
 });
 
+test('una HP arancione molto corta resta presente e non dichiara un falso KO', () => {
+  const png = new PNG({ width: 960, height: 540 });
+  png.data.fill(0);
+  for (let index = 3; index < png.data.length; index += 4) png.data[index] = 255;
+  // Riproduce il frame live: con letterbox e HP quasi esaurita restano sei campioni validi.
+  for (const x of [755, 763, 771, 779, 787, 795]) {
+    for (let y = 63; y < 65; y += 1) {
+      for (let dx = 0; dx < 2; dx += 1) {
+        const offset = (y * png.width + x + dx) * 4;
+        png.data[offset] = 207;
+        png.data[offset + 1] = 128;
+        png.data[offset + 2] = 39;
+      }
+    }
+  }
+  assert.equal(readCombatHealth(png).p2, true);
+});
+
 test('il KO richiede una HP vuota persistente e non scatta con entrambe piene', () => {
   const detector = new KnockoutDetector({ delayMs: 1_500 });
   assert.equal(detector.observe({ p1: true, p2: true }, 0), false);

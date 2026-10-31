@@ -251,7 +251,9 @@ export function readCombatHealth(png) {
         if (high > 85 && blue < high * 0.75 && red + green > blue * 2.2 && spread > 40) count += 1;
       }
     }
-    return count > 8;
+    // Anche una HP quasi esaurita può produrre meno di nove campioni validi:
+    // soltanto l'assenza completa di pixel HP può alimentare il detector KO.
+    return count > 0;
   };
   return { p1: hasHealth(0.17, 0.43), p2: hasHealth(0.57, 0.83) };
 }
