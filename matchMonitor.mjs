@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasPauseMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
+import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasPauseMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
 
 export async function monitorPostMatch(page, {
   capture,
@@ -87,6 +87,22 @@ export async function monitorPostMatch(page, {
         await page.waitForTimeout(1_000);
         continue;
       }
+      // Recovery: il driver può aver caricato il nuovo round senza aggiornare
+      // la fase dopo un'attesa scaduta. Non rieseguire mai i menu sopra il match.
+      const png = PNG.sync.read(await capture(page));
+      if (hasCombatHudFrame(png) && hasActiveCombatFrame(png) && !hasPauseMenuFrame(png)) {
+        console.log('[BT3 round] nuove HP e timer già visibili: sincronizzo HUD e pad');
+        await page.evaluate(() => {
+          window.marketArena.match.restart();
+          window.marketArena.bridge.setMode(0, 'neutral');
+          window.marketArena.bridge.setMode(1, 'neutral');
+          window.__BT3_MARKET_ARENA__.automationError = null;
+        });
+        lastHealth = { p1: true, p2: true };
+        inputsSuspended = false;
+        await page.waitForTimeout(1_000);
+        continue;
+      }
       // Il menu dei risultati appartiene al vincitore: 1P usa tastiera, 2P gamepad.
       const menuPlayer = lastHealth?.p1 && !lastHealth?.p2 ? 0 : 1;
       const plan = await runRematchSequence(page, { menuPlayer });
@@ -94,6 +110,9 @@ export async function monitorPostMatch(page, {
     } catch (error) {
       if (isClosed()) break;
       console.error(`[BT3 round] ${error.message}`);
+      await page.evaluate((message) => {
+        window.__BT3_MARKET_ARENA__.automationError = message;
+      }, String(error?.stack ?? error));
       await page.waitForTimeout(3_000);
     }
   }

@@ -54,3 +54,49 @@ test('la pausa sospende i pad e preme Start senza dichiarare un KO', async () =>
   assert.equal(evaluations.some(({ source }) => source.includes('notifyKO')), false);
   assert.equal(evaluations.some(({ source }) => source.includes("setMode(0, 'idle')")), true);
 });
+
+test('se il nuovo match è già attivo ma resta postmatch, riavvia HUD e pad senza menu', async () => {
+  const png = new PNG({ width: 960, height: 540 });
+  for (let index = 0; index < png.data.length; index += 4) {
+    png.data[index] = 35;
+    png.data[index + 1] = 130;
+    png.data[index + 2] = 55;
+    png.data[index + 3] = 255;
+  }
+  const paint = (x0, x1, y0, y1, [red, green, blue]) => {
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const offset = (y * png.width + x) * 4;
+        png.data[offset] = red;
+        png.data[offset + 1] = green;
+        png.data[offset + 2] = blue;
+      }
+    }
+  };
+  paint(164, 412, 35, 55, [40, 210, 55]);
+  paint(548, 796, 35, 55, [40, 210, 55]);
+  paint(460, 500, 35, 70, [240, 240, 240]);
+
+  let closed = false;
+  let stateReads = 0;
+  const evaluations = [];
+  const page = {
+    isClosed: () => closed,
+    waitForTimeout: async () => { closed = true; },
+    screenshot: async () => { throw new Error('Non deve cercare di nuovo il menu dei risultati.'); },
+    keyboard: { down: () => {}, up: () => {} },
+    evaluate: async (fn, arg) => {
+      evaluations.push({ source: fn.toString(), arg });
+      stateReads += 1;
+      if (stateReads === 1) {
+        return { phase: 'postmatch', round: 1, durationMs: 0, features: { autoRematch: true, visualKO: true } };
+      }
+      return undefined;
+    },
+  };
+
+  await monitorPostMatch(page, { capture: async () => PNG.sync.write(png) });
+
+  assert.equal(evaluations.some(({ source }) => source.includes('match.restart()')), true);
+  assert.equal(evaluations.some(({ source }) => source.includes("setMode(0, 'neutral')")), true);
+});
