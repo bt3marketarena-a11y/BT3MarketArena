@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
+import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasPauseMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
 
 export async function monitorPostMatch(page, {
   capture,
@@ -28,15 +28,35 @@ export async function monitorPostMatch(page, {
       }
       if (phase === 'fighting') {
         const png = PNG.sync.read(await capture(page));
+        const pauseMenu = hasPauseMenuFrame(png);
         const activeCombat = hasActiveCombatFrame(png);
-        endDetector.observe(activeCombat);
         const health = readCombatHealth(png);
-        await page.evaluate(({ activeCombat: timerVisible, health: hp, phase: currentPhase, round }) => {
+        await page.evaluate(({ activeCombat: timerVisible, health: hp, pauseMenuVisible, phase: currentPhase, round }) => {
           window.__BT3_MARKET_ARENA__.validation = {
             checkedAt: new Date().toISOString(), phase: currentPhase, round,
-            combatTimerVisible: timerVisible, health: hp,
+            combatTimerVisible: timerVisible, health: hp, pauseMenuVisible,
           };
-        }, { activeCombat, health, phase, round: state.round });
+        }, { activeCombat, health, pauseMenuVisible: pauseMenu, phase, round: state.round });
+        if (pauseMenu) {
+          // Il menu di pausa oscura le HP: non è un KO. Start riprende il round
+          // senza selezionare Skill List, Character Select o Main Menu.
+          endDetector.reset();
+          koDetector.reset();
+          if (!inputsSuspended) {
+            await page.evaluate(() => {
+              window.marketArena.bridge.setMode(0, 'idle');
+              window.marketArena.bridge.setMode(1, 'idle');
+            });
+            inputsSuspended = true;
+          }
+          console.log('[BT3 round] pausa rilevata: ripresa con Start, nessun KO');
+          await page.keyboard.down('Enter');
+          await page.waitForTimeout(220);
+          await page.keyboard.up('Enter');
+          await page.waitForTimeout(1_000);
+          continue;
+        }
+        endDetector.observe(activeCombat);
         if (state.features.visualKO && koDetector.observe(health)) {
           console.log('[BT3 round] HP vuote rilevate sullo schermo reale: stop prima di Character Select');
           await page.evaluate(() => window.marketArena.match.notifyKO(null, 'visual-hp-zero'));

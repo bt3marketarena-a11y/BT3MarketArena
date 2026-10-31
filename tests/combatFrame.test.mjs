@@ -120,3 +120,24 @@ test('il KO richiede una HP vuota persistente e non scatta con entrambe piene', 
   assert.equal(detector.observe({ p1: false, p2: true }, 3_500), true);
   assert.equal(detector.observe({ p1: false, p2: true }, 4_000), false);
 });
+
+test('il menu di pausa centrale non viene confuso con il combattimento o un KO', async () => {
+  const { hasPauseMenuFrame } = await import('../menuDriver.mjs');
+  const png = frame();
+  const paint = (x0, x1, y0, y1, [red, green, blue]) => {
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const offset = (y * png.width + x) * 4;
+        png.data[offset] = red;
+        png.data[offset + 1] = green;
+        png.data[offset + 2] = blue;
+      }
+    }
+  };
+  assert.equal(hasPauseMenuFrame(png), false);
+  paint(350, 1570, 350, 730, [12, 35, 55]);
+  for (let row = 0; row < 4; row += 1) {
+    paint(650, 1270, 455 + row * 55, 470 + row * 55, [230, 230, 225]);
+  }
+  assert.equal(hasPauseMenuFrame(png), true);
+});

@@ -85,6 +85,28 @@ export function hasActiveCombatFrame(png) {
   return timerPixels > 10;
 }
 
+export function hasPauseMenuFrame(png) {
+  let samples = 0;
+  let dark = 0;
+  let brightText = 0;
+  // Il menu 1P/2P Pause copre il centro con un pannello blu scuro e voci bianche.
+  // La combinazione evita di classificare come pausa un'arena notturna o una nuvola.
+  for (let y = Math.floor(png.height * 0.32); y < Math.ceil(png.height * 0.68); y += 4) {
+    for (let x = Math.floor(png.width * 0.18); x < Math.ceil(png.width * 0.82); x += 4) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blue = png.data[offset + 2];
+      const high = Math.max(red, green, blue);
+      const low = Math.min(red, green, blue);
+      if (high < 105 && blue >= red) dark += 1;
+      if (low > 150 && high - low < 65) brightText += 1;
+      samples += 1;
+    }
+  }
+  return samples > 0 && dark / samples > 0.45 && brightText > 40;
+}
+
 export class CombatEndDetector {
   constructor({ delayMs = 12_000 } = {}) {
     this.delayMs = delayMs;
