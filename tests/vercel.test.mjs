@@ -57,6 +57,7 @@ test('Vercel forza il routing statico e conserva soltanto la Function state', as
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
   assert.deepEqual(config, {
     version: 2,
+    framework: null,
     buildCommand: 'npm run build',
     outputDirectory: 'public',
     rewrites: [
