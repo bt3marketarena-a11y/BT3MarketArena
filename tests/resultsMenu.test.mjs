@@ -186,6 +186,12 @@ test('da Return to Main Menu il driver sale a Character Select con impulsi brevi
   }
 });
 
+test('EXIT resta leggibile quando il personaggio scurisce il lato destro', () => {
+  const png = exitFrame(1);
+  paint(png, 700, 175, 790, 365, [12, 35, 55]);
+  assert.equal(readExitPromptSelection(png), 1);
+});
+
 test('il pannello EXIT distingue Yes da No', () => {
   assert.equal(readExitPromptSelection(exitFrame(0)), 0);
   assert.equal(readExitPromptSelection(exitFrame(1)), 1);

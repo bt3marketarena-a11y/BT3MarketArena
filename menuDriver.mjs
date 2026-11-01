@@ -265,9 +265,10 @@ export function hasResultsMenuFrame(png) {
 export function hasExitPromptFrame(png) {
   const { darkRatio, brightText } = pausePanelStats(png);
   const center = darkPanelRatio(png, 0.3, 0.7, 0.34, 0.65);
-  const left = darkPanelRatio(png, 0.18, 0.28);
-  const right = darkPanelRatio(png, 0.72, 0.82);
-  return darkRatio > 0.2 && brightText > 24 && center > 0.4 && left < 0.15 && right < 0.15;
+  // Il personaggio alle spalle può scurire i lati: Yes/No evidenziati e il
+  // pannello centrale identificano EXIT senza dipendere dallo sfondo.
+  const yesNoSelection = yellowTextCount(png, 280) > 20 || yellowTextCount(png, 311) > 20;
+  return !hasResultsMenuFrame(png) && darkRatio > 0.2 && brightText > 24 && center > 0.4 && yesNoSelection;
 }
 
 function yellowTextCount(png, center) {
