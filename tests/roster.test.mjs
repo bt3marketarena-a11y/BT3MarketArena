@@ -41,6 +41,8 @@ function addCustomSelect(png, player) {
 function addSelectColor(png, player) {
   const x0 = player === 0 ? 140 : 540;
   paint(png, x0, 160, x0 + 280, 280, player === 0 ? [15, 45, 85] : [90, 15, 65]);
+  // Il titolo reale ha un fondo magenta chiaro: non è una riga del pannello scuro.
+  paint(png, x0, 165, x0 + 280, 195, [180, 40, 120]);
   paint(png, x0 + 65, 176, x0 + 215, 186, [240, 220, 225]);
   paint(png, x0 + 85, 219, x0 + 195, 231, [240, 220, 225]);
   // Il bordo inferiore può cadere nella fascia 267: non è una riga Custom 2.

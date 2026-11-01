@@ -175,7 +175,8 @@ export function hasCustomSelectFrame(png, player) {
 }
 
 export function hasSelectColorFrame(png, player) {
-  return rosterPanelRow(png, player, 181)
+  // Il titolo Select Color ha fondo chiaro; soltanto la riga numerica è scura.
+  return rosterTextCount(png, player, 181) > 50
     && rosterPanelRow(png, player, 225)
     && !rosterPanelRow(png, player, 309);
 }
