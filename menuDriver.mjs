@@ -128,12 +128,31 @@ export function hasPauseMenuFrame(png) {
   return darkRatio > 0.45 && brightText > 24;
 }
 
+function brightRowTextCount(png, center) {
+  const scaledCenter = center * png.height / 540;
+  let count = 0;
+  for (let y = Math.floor(scaledCenter - 6 * png.height / 540); y <= Math.ceil(scaledCenter + 6 * png.height / 540); y += 2) {
+    for (let x = Math.floor(png.width * 0.2); x < Math.ceil(png.width * 0.8); x += 3) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blue = png.data[offset + 2];
+      const neutral = Math.min(red, green, blue) > 150 && Math.max(red, green, blue) - Math.min(red, green, blue) < 65;
+      const yellow = red > 140 && green > 100 && blue < 120 && red > blue * 1.6 && green > blue * 1.3;
+      if (neutral || yellow) count += 1;
+    }
+  }
+  return count;
+}
+
 export function hasResultsMenuFrame(png) {
   const { darkRatio, brightText } = pausePanelStats(png);
-  // Il menu risultati è largo; EXIT? è stretto e lascia scoperte queste fasce.
+  // Il menu finale ha sei voci, incluso Replay Data nelle ultime due righe.
+  // Il normale menu pausa si ferma a quattro e non deve chiudere il round.
   const left = darkPanelRatio(png, 0.18, 0.28);
   const right = darkPanelRatio(png, 0.72, 0.82);
-  return darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35;
+  const replayRows = brightRowTextCount(png, 342) > 20 && brightRowTextCount(png, 371) > 20;
+  return darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35 && replayRows;
 }
 
 export function hasExitPromptFrame(png) {
@@ -394,7 +413,7 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
 /** Dopo KO/timeout naviga dalla voce realmente evidenziata a Character Select. */
 export async function runRematchSequence(page, options = {}) {
   const { tap, padTap, progress } = createMenuControls(page, options.onProgress ?? (() => {}));
-  const menuPlayer = options.menuPlayer === 0 ? 0 : 1;
+  let menuPlayer = options.menuPlayer === 0 ? 0 : 1;
   const rosterSequence = options.rosterSequence ?? runRosterSequence;
   await page.evaluate(() => {
     window.marketArena.bridge.setMode(0, 'idle');
@@ -402,22 +421,33 @@ export async function runRematchSequence(page, options = {}) {
     document.querySelector('canvas')?.focus();
   });
   progress('attesa visiva del menu dei risultati; nessuna conferma anticipata');
-  const selected = await waitForResultsMenu(page, { menuPlayer });
-  const delta = selected - 1;
-  const direction = delta > 0 ? 'up' : 'down';
-  const key = delta > 0 ? 'ArrowUp' : 'ArrowDown';
+  let selected = await waitForResultsMenu(page, { menuPlayer });
   progress(`post-match P${menuPlayer + 1}: dalla voce ${selected + 1} a Character Select`);
-  for (let index = 0; index < Math.abs(delta); index += 1) {
-    // Sotto la soglia di auto-repeat: una pressione deve spostare una sola riga.
-    if (menuPlayer === 0) await tap(key, 120);
-    else await padTap(direction, 120);
-    await wait(page, 350);
+  for (let attempt = 0; selected !== 1 && attempt < 12; attempt += 1) {
+    const direction = selected > 1 ? 'up' : 'down';
+    const key = selected > 1 ? 'ArrowUp' : 'ArrowDown';
+    const previous = selected;
+    let moved = false;
+    // Il titolo 1P/2P Pause non sempre coincide con il vincitore ricostruito
+    // dalle HP. Prova l'altro pad soltanto con direzioni, mai con conferme.
+    for (const candidate of [menuPlayer, menuPlayer === 0 ? 1 : 0]) {
+      for (let retry = 0; retry < 2 && !moved; retry += 1) {
+        if (candidate === 0) await tap(key, 120);
+        else await padTap(direction, 120);
+        await wait(page, 350);
+        selected = readResultsMenuSelection(PNG.sync.read(await page.screenshot()));
+        if (selected === null) throw new Error('Menu risultati non più leggibile durante lo spostamento.');
+        if (selected !== previous) {
+          if (candidate !== menuPlayer) progress(`input post-match recepito da P${candidate + 1}; fallback completato`);
+          menuPlayer = candidate;
+          moved = true;
+        }
+      }
+      if (moved) break;
+    }
+    if (!moved) throw new Error(`Nessun movimento del menu dalla voce ${previous + 1}; conferma bloccata.`);
   }
-  await wait(page, 800);
-  const verified = readResultsMenuSelection(PNG.sync.read(await page.screenshot()));
-  if (verified !== 1) {
-    throw new Error(`Character Select non verificato visivamente (voce ${verified === null ? 'ignota' : verified + 1}); conferma bloccata.`);
-  }
+  if (selected !== 1) throw new Error('Character Select non raggiunto entro 12 movimenti verificati.');
   if (menuPlayer === 0) await tap('k', 400);
   else await padTap('cross', 400);
   await wait(page, 1_200);

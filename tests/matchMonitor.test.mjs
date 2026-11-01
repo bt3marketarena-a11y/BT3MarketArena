@@ -100,3 +100,67 @@ test('se il nuovo match è già attivo ma resta postmatch, riavvia HUD e pad sen
   assert.equal(evaluations.some(({ source }) => source.includes('match.restart()')), true);
   assert.equal(evaluations.some(({ source }) => source.includes("setMode(0, 'neutral')")), true);
 });
+
+test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci', async () => {
+  const combat = new PNG({ width: 960, height: 540 });
+  combat.data.fill(0);
+  for (let index = 3; index < combat.data.length; index += 4) combat.data[index] = 255;
+  for (let y = 55; y < 67; y += 1) {
+    for (let x = 164; x < 412; x += 1) {
+      const offset = (y * combat.width + x) * 4;
+      combat.data[offset] = 40;
+      combat.data[offset + 1] = 210;
+      combat.data[offset + 2] = 55;
+    }
+  }
+  const results = new PNG({ width: 960, height: 540 });
+  for (let index = 0; index < results.data.length; index += 4) {
+    results.data[index] = 35;
+    results.data[index + 1] = 130;
+    results.data[index + 2] = 55;
+    results.data[index + 3] = 255;
+  }
+  const paint = (x0, x1, y0, y1, color) => {
+    for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
+      const offset = (y * results.width + x) * 4;
+      [results.data[offset], results.data[offset + 1], results.data[offset + 2]] = color;
+    }
+  };
+  paint(170, 790, 145, 400, [12, 35, 55]);
+  [225, 252, 284, 311, 342, 371].forEach((center, index) => {
+    paint(310, 650, center - 5, center + 5, index === 0 ? [230, 220, 40] : [220, 225, 230]);
+  });
+
+  const originalNow = Date.now;
+  let now = 0;
+  Date.now = () => now;
+  let closed = false;
+  let captures = 0;
+  let waits = 0;
+  let stateReads = 0;
+  const notifyAt = [];
+  const frames = [combat, combat, results];
+  const page = {
+    isClosed: () => closed,
+    waitForTimeout: async (ms) => {
+      now += ms * 2;
+      waits += 1;
+      if (waits >= 3) closed = true;
+    },
+    keyboard: { down: () => {}, up: () => {} },
+    evaluate: async (fn) => {
+      if (fn.toString().includes('notifyKO')) notifyAt.push(captures);
+      stateReads += 1;
+      if (stateReads === 1 || fn.toString().includes("phase: window.marketArena")) {
+        return { phase: 'fighting', round: 1, durationMs: 0, features: { autoRematch: true, visualKO: true } };
+      }
+      return undefined;
+    },
+  };
+  try {
+    await monitorPostMatch(page, { capture: async () => PNG.sync.write(frames[Math.min(captures++, frames.length - 1)]) });
+  } finally {
+    Date.now = originalNow;
+  }
+  assert.deepEqual(notifyAt, [3]);
+});

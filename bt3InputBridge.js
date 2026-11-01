@@ -41,9 +41,13 @@ const teleportCounter = [
   f(['square']), f(), f(['square']), f(), f(['triangle']), f(),
 ];
 const cinematic = (frames) => frames.flatMap((frame) => [frame, frame, frame]);
+// Il lock-on non avvicina i lottatori: ogni offensiva parte da un avanzamento
+// mantenuto abbastanza a lungo da essere recepito dal motore Wasm.
+const approach = Array.from({ length: 16 }, () => f(['up']));
 
 export const MACROS = Object.freeze({
   zCounterLoop,
+  approach,
   rushCombo,
   blast2,
   ultimateFinal: [
@@ -53,11 +57,13 @@ export const MACROS = Object.freeze({
   sidestep,
   teleportCounter,
   cinematicLoop: [
-    ...zCounterLoop, ...idleFrames(18),
-    ...cinematic(rushCombo), ...idleFrames(24),
-    ...cinematic(teleportCounter), ...idleFrames(18),
-    ...cinematic(sidestep), ...idleFrames(12),
-    ...cinematic(blast2), ...idleFrames(36),
+    ...cinematic(approach),
+    ...cinematic(rushCombo), ...idleFrames(12),
+    ...cinematic(teleportCounter), ...idleFrames(12),
+    ...cinematic(sidestep), ...idleFrames(8),
+    ...cinematic(approach),
+    ...cinematic(blast2), ...idleFrames(18),
+    ...zCounterLoop, ...idleFrames(12),
   ],
 });
 
@@ -211,7 +217,13 @@ export class BT3InputBridge {
   stepFrame() {
     for (let index = 0; index < 2; index += 1) {
       const current = this.runtime[index];
-      this.releaseAll(index);
+      if (current) {
+        this.releaseAll(index);
+      } else {
+        // In idle il driver può mantenere un pulsante per centinaia di ms:
+        // rilascia soltanto il precedente impulso L1, non gli input manuali.
+        this.setButton(index, 'l1', false);
+      }
       if (current) {
         const frame = current.frames[current.cursor];
         for (const name of frame.press) this.setButton(index, name, true);
@@ -222,6 +234,7 @@ export class BT3InputBridge {
             current.cursor = 0;
           } else {
             this.runtime[index] = null;
+            this.releaseAll(index);
             current.resolve({ cancelled: false });
           }
         }

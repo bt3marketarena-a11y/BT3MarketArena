@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasPauseMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
+import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasPauseMenuFrame, hasResultsMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
 
 export async function monitorPostMatch(page, {
   capture,
@@ -9,6 +9,7 @@ export async function monitorPostMatch(page, {
   let lastState = '';
   let lastHealth = null;
   let inputsSuspended = false;
+  let koPending = false;
   const endDetector = new CombatEndDetector({ delayMs: 12_000 });
   const koDetector = new KnockoutDetector({ delayMs: 1_500 });
   while (!isClosed()) {
@@ -26,24 +27,42 @@ export async function monitorPostMatch(page, {
         lastState = signature;
         endDetector.reset();
         koDetector.reset();
+        koPending = false;
       }
       if (phase === 'fighting') {
         const png = PNG.sync.read(await capture(page));
-        const pauseMenu = hasPauseMenuFrame(png);
+        const resultsMenu = hasResultsMenuFrame(png);
+        const pauseMenu = !resultsMenu && hasPauseMenuFrame(png);
         const activeCombat = hasActiveCombatFrame(png);
         const health = readCombatHealth(png);
-        if (!pauseMenu) lastHealth = health;
-        await page.evaluate(({ activeCombat: timerVisible, health: hp, pauseMenuVisible, phase: currentPhase, round }) => {
+        if (!pauseMenu && !resultsMenu) lastHealth = health;
+        await page.evaluate(({ activeCombat: timerVisible, health: hp, pauseMenuVisible, resultsMenuVisible, knockoutPending, phase: currentPhase, round }) => {
           window.__BT3_MARKET_ARENA__.validation = {
             checkedAt: new Date().toISOString(), phase: currentPhase, round,
             combatTimerVisible: timerVisible, health: hp, pauseMenuVisible,
+            resultsMenuVisible, koPending: knockoutPending,
           };
-        }, { activeCombat, health, pauseMenuVisible: pauseMenu, phase, round: state.round });
+        }, { activeCombat, health, pauseMenuVisible: pauseMenu, resultsMenuVisible: resultsMenu, knockoutPending: koPending, phase, round: state.round });
+        if (resultsMenu) {
+          console.log('[BT3 round] menu finale a sei voci rilevato: KO confermato dal gioco');
+          endDetector.reset();
+          koDetector.reset();
+          koPending = false;
+          await page.evaluate(() => {
+            window.marketArena.bridge.setMode(0, 'idle');
+            window.marketArena.bridge.setMode(1, 'idle');
+            window.marketArena.match.notifyKO(null, 'visual-results-menu');
+          });
+          inputsSuspended = true;
+          await page.waitForTimeout(250);
+          continue;
+        }
         if (pauseMenu) {
-          // Il menu di pausa oscura le HP: non è un KO. Start riprende il round
+          // Il normale menu di pausa oscura le HP: non è un KO. Start riprende
           // senza selezionare Skill List, Character Select o Main Menu.
           endDetector.reset();
           koDetector.reset();
+          koPending = false;
           if (!inputsSuspended) {
             await page.evaluate(() => {
               window.marketArena.bridge.setMode(0, 'idle');
@@ -60,8 +79,20 @@ export async function monitorPostMatch(page, {
         }
         endDetector.observe(activeCombat);
         if (state.features.visualKO && koDetector.observe(health)) {
-          console.log('[BT3 round] HP vuote rilevate sullo schermo reale: stop prima di Character Select');
-          await page.evaluate(() => window.marketArena.match.notifyKO(null, 'visual-hp-zero'));
+          koPending = true;
+          console.log('[BT3 round] possibile KO: pad sospesi, attesa del menu finale prima di cambiare fase');
+        }
+        if (koPending && health.p1 && health.p2 && activeCombat) koPending = false;
+        if (koPending) {
+          if (!inputsSuspended) {
+            await page.evaluate(() => {
+              window.marketArena.bridge.setMode(0, 'idle');
+              window.marketArena.bridge.setMode(1, 'idle');
+            });
+            inputsSuspended = true;
+          }
+          await page.waitForTimeout(250);
+          continue;
         }
         if (activeCombat) {
           if (inputsSuspended) {
@@ -72,7 +103,7 @@ export async function monitorPostMatch(page, {
             inputsSuspended = false;
           }
         } else if (!inputsSuspended && endDetector.missingSince !== null && Date.now() - endDetector.missingSince >= 2_000) {
-          console.log('[BT3 round] timer assente: pad sospesi, ma nessun KO senza una HP vuota');
+          console.log('[BT3 round] timer assente: pad sospesi, ma nessun KO senza il menu finale');
           await page.evaluate(() => {
             window.marketArena.bridge.setMode(0, 'idle');
             window.marketArena.bridge.setMode(1, 'idle');

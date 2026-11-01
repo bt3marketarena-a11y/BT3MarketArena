@@ -69,10 +69,34 @@ test('le macro avanzano frame per frame e rilasciano i pulsanti precedenti', () 
   assert.equal(bridge.getPad(0).buttons[BUTTONS.square].pressed, false);
 });
 
-test('zCounterLoop attiva guardia e direzione nello stato neutro', () => {
+test('il D-pad manuale resta premuto fra i frame quando il pad è idle', () => {
+  const bridge = new BT3InputBridge({ window: fakeWindow(), autoStart: false });
+  bridge.install();
+  bridge.setMode(1, 'idle');
+  bridge.setButton(1, 'down', true);
+  bridge.stepFrame();
+  bridge.stepFrame();
+  bridge.stepFrame();
+  assert.equal(bridge.getPad(1).buttons[BUTTONS.down].pressed, true);
+  bridge.setButton(1, 'down', false);
+  bridge.stepFrame();
+  assert.equal(bridge.getPad(1).buttons[BUTTONS.down].pressed, false);
+});
+
+test('la coreografia avvicina i lottatori prima degli attacchi', () => {
+  const firstForward = MACROS.cinematicLoop.findIndex((frame) => frame.press.includes('up'));
+  const firstAttack = MACROS.cinematicLoop.findIndex((frame) => frame.press.includes('square'));
+  assert.ok(firstForward >= 0, 'manca il movimento in avanti');
+  assert.ok(firstForward < firstAttack, 'il primo attacco deve avvenire dopo l’avvicinamento');
+});
+
+test('lo stato neutro avanza prima e zCounterLoop conserva guardia e direzione', () => {
   const bridge = new BT3InputBridge({ window: fakeWindow(), autoStart: false });
   bridge.install();
   bridge.setMode(0, 'neutral');
+  bridge.stepFrame();
+  assert.equal(bridge.getPad(0).buttons[BUTTONS.up].pressed, true);
+  bridge.playMacro(0, 'zCounterLoop');
   bridge.stepFrame();
   assert.equal(bridge.getPad(0).buttons[BUTTONS.guard].pressed, true);
   assert.equal(bridge.getPad(0).buttons[BUTTONS.left].pressed, true);

@@ -12,7 +12,8 @@ test('il bundle Playwright conserva il bootstrap MAIN-world esistente', async ()
 test('il bundle web include driver e monitor senza dipendenze Node', async () => {
   const bundle = await createInjectionBundle({ web: true });
   assert.match(bundle, /__BT3_MARKET_ARENA__/);
-  assert.match(bundle, /visual-hp-zero/);
+  assert.match(bundle, /visual-results-menu/);
+  assert.doesNotMatch(bundle, /visual-hp-zero/);
   assert.match(bundle, /Character Select/);
   assert.doesNotMatch(bundle, /require\("node:|require\("fs"|require\("path"/);
 });

@@ -78,6 +78,16 @@ test('il menu risultati largo è distinto dal pannello EXIT stretto', () => {
   assert.equal(hasResultsMenuFrame(exitFrame()), false);
 });
 
+test('il menu pausa a quattro voci non viene scambiato per il menu finale', () => {
+  const png = new PNG({ width: 960, height: 540 });
+  paint(png, 0, 0, 960, 540, [35, 130, 55]);
+  paint(png, 170, 145, 790, 400, [12, 35, 55]);
+  for (const center of [225, 252, 284, 311]) {
+    paint(png, 310, center - 5, 650, center + 5, [220, 225, 230]);
+  }
+  assert.equal(hasResultsMenuFrame(png), false);
+});
+
 test('la selezione Character Select viene letta senza assumere Fight Again', () => {
   for (const selected of [0, 1, 3, 5]) {
     assert.equal(readResultsMenuSelection(resultsFrame(selected)), selected);
@@ -159,6 +169,33 @@ test('dopo Character Select il driver sceglie Yes su EXIT prima del roster', asy
     assert.deepEqual(buttons, [
       [1, 'cross', true], [1, 'cross', false],
       [1, 'up', true], [1, 'up', false],
+      [1, 'cross', true], [1, 'cross', false],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+test('se P1 non muove il menu il driver prova P2 e conferma solo dopo il movimento', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const moved = events.some((event) => event.type === 'button' && event.args[1] === 'down' && !event.args[2]);
+    const confirmed = events.some((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]);
+    if (confirmed) {
+      const png = new PNG({ width: 960, height: 540 });
+      paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      return PNG.sync.write(png);
+    }
+    return PNG.sync.write(resultsFrame(moved ? 1 : 0));
+  }, events);
+  try {
+    await runRematchSequence(page, {
+      menuPlayer: 0,
+      rosterSequence: async () => ({ verified: true }),
+    });
+    const buttons = events.filter((event) => event.type === 'button').map((event) => event.args);
+    assert.deepEqual(buttons, [
+      [1, 'down', true], [1, 'down', false],
       [1, 'cross', true], [1, 'cross', false],
     ]);
   } finally {

@@ -55,12 +55,12 @@ test('il monitor rileva la fine match e il launcher conserva la cattura Windows'
   const launcher = await read('launcher.mjs');
   assert.match(monitor, /CombatEndDetector/);
   assert.match(monitor, /hasActiveCombatFrame/);
-  assert.doesNotMatch(monitor, /notifyKO\(null, 'visual-result'\)/);
+  assert.doesNotMatch(monitor, /notifyKO\(null, 'visual-hp-zero'\)/);
   assert.match(monitor, /endDetector\.reset\(\)/);
   assert.match(monitor, /KnockoutDetector/);
   assert.match(monitor, /readCombatHealth/);
   assert.match(launcher, /captureGameFrame/);
-  assert.match(monitor, /notifyKO\(null, 'visual-hp-zero'\)/);
+  assert.match(monitor, /notifyKO\(null, 'visual-results-menu'\)/);
   assert.match(monitor, /features\.visualKO/);
   assert.match(monitor, /features\.autoRematch/);
   assert.match(monitor, /validation\s*=/);
