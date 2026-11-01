@@ -155,11 +155,13 @@ test('il pannello EXIT distingue Yes da No', () => {
 
 test('dopo Character Select il driver sceglie Yes su EXIT prima del roster', async () => {
   const events = [];
+  const waits = [];
   const { page, restore } = fakePage(async () => {
     const confirmations = events.filter((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]).length;
     const movedToYes = events.some((event) => event.type === 'button' && event.args[1] === 'up' && !event.args[2]);
     return PNG.sync.write(confirmations === 0 ? resultsFrame(1) : exitFrame(movedToYes ? 0 : 1));
   }, events);
+  page.waitForTimeout = async (ms) => { waits.push(ms); };
   try {
     await runRematchSequence(page, {
       menuPlayer: 1,
@@ -171,6 +173,7 @@ test('dopo Character Select il driver sceglie Yes su EXIT prima del roster', asy
       [1, 'up', true], [1, 'up', false],
       [1, 'cross', true], [1, 'cross', false],
     ]);
+    assert.equal(waits.includes(8_000), false, 'il roster deve attendere il proprio stato visivo, non 8 s fissi');
   } finally {
     restore();
   }

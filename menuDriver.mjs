@@ -128,6 +128,88 @@ export function hasPauseMenuFrame(png) {
   return darkRatio > 0.45 && brightText > 24;
 }
 
+function rosterTextCount(png, player, center) {
+  const [minX, maxX] = player === 0 ? [0.16, 0.43] : [0.57, 0.84];
+  const scaledCenter = center * png.height / 540;
+  let count = 0;
+  for (let y = Math.floor(scaledCenter - 7 * png.height / 540); y <= Math.ceil(scaledCenter + 7 * png.height / 540); y += 2) {
+    for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 3) {
+      const offset = (y * png.width + x) * 4;
+      const high = Math.max(png.data[offset], png.data[offset + 1], png.data[offset + 2]);
+      const low = Math.min(png.data[offset], png.data[offset + 1], png.data[offset + 2]);
+      if (high > 150 && low > 55) count += 1;
+    }
+  }
+  return count;
+}
+
+function rosterRowDarkRatio(png, player, center) {
+  const [minX, maxX] = player === 0 ? [0.16, 0.43] : [0.57, 0.84];
+  const scaledCenter = center * png.height / 540;
+  let samples = 0;
+  let dark = 0;
+  for (let y = Math.floor(scaledCenter - 10 * png.height / 540); y <= Math.ceil(scaledCenter + 10 * png.height / 540); y += 3) {
+    for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 4) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blue = png.data[offset + 2];
+      const high = Math.max(red, green, blue);
+      const panel = player === 0
+        ? blue > red * 1.1 && blue > green * 1.05
+        : red > green * 1.25 && blue > green * 1.1;
+      if (high < 150 && panel) dark += 1;
+      samples += 1;
+    }
+  }
+  return samples ? dark / samples : 0;
+}
+
+function rosterPanelRow(png, player, center) {
+  return rosterTextCount(png, player, center) > 50 && rosterRowDarkRatio(png, player, center) > 0.2;
+}
+
+export function hasCustomSelectFrame(png, player) {
+  return rosterPanelRow(png, player, 309)
+    && [181, 224, 267].filter((center) => rosterPanelRow(png, player, center)).length >= 2;
+}
+
+export function hasSelectColorFrame(png, player) {
+  return rosterPanelRow(png, player, 181)
+    && rosterPanelRow(png, player, 225)
+    && !rosterPanelRow(png, player, 309);
+}
+
+export function hasCharacterSelectionFrame(png) {
+  let blue = 0;
+  let magenta = 0;
+  for (let y = Math.floor(png.height * 0.06); y < Math.ceil(png.height * 0.19); y += 4) {
+    for (let x = Math.floor(png.width * 0.12); x < Math.ceil(png.width * 0.88); x += 6) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blueChannel = png.data[offset + 2];
+      if (blueChannel > 110 && blueChannel > red * 1.35 && blueChannel > green * 1.15) blue += 1;
+    }
+  }
+  for (let y = Math.floor(png.height * 0.82); y < Math.ceil(png.height * 0.96); y += 4) {
+    for (let x = Math.floor(png.width * 0.12); x < Math.ceil(png.width * 0.88); x += 6) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blueChannel = png.data[offset + 2];
+      if (red > 100 && blueChannel > 60 && red > green * 1.5 && blueChannel > green * 1.3) magenta += 1;
+    }
+  }
+  return blue > 30 && magenta > 30 && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
+}
+
+export function hasMapSelectionFrame(png) {
+  return hasColorfulGameFrame(png)
+    && !hasCharacterSelectionFrame(png)
+    && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
+}
+
 function brightRowTextCount(png, center) {
   const scaledCenter = center * png.height / 540;
   let count = 0;
@@ -326,7 +408,7 @@ async function waitForCombatStart(page, timeoutMs = 90_000) {
   throw new Error('Le barre HP non sono comparse: introduzione non superata entro 90 secondi.');
 }
 
-function createMenuControls(page, onProgress) {
+export function createMenuControls(page, onProgress) {
   const tap = async (key, holdMs = 220) => {
     await page.keyboard.down(key);
     await wait(page, holdMs);
@@ -341,9 +423,15 @@ function createMenuControls(page, onProgress) {
   const padTap = async (button, holdMs = 300) => {
     await page.evaluate(async ({ button: name, holdMs: duration }) => {
       const bridge = window.marketArena.bridge;
-      bridge.setButton(1, name, true);
-      await new Promise((resolve) => setTimeout(resolve, duration));
-      bridge.setButton(1, name, false);
+      const keyboardEvents = bridge.keyboardEvents;
+      bridge.keyboardEvents = false;
+      try {
+        bridge.setButton(1, name, true);
+        await new Promise((resolve) => setTimeout(resolve, duration));
+        bridge.setButton(1, name, false);
+      } finally {
+        bridge.keyboardEvents = keyboardEvents;
+      }
     }, { button, holdMs });
     await wait(page, 300);
   };
@@ -352,6 +440,34 @@ function createMenuControls(page, onProgress) {
     console.log(`[BT3 menu] ${stage}`);
   };
   return { tap, moveNative, padTap, progress };
+}
+
+async function waitForRosterState(page, predicate, label, timeoutMs = 20_000) {
+  const startedAt = Date.now();
+  let stableFrames = 0;
+  while (Date.now() - startedAt < timeoutMs) {
+    const png = PNG.sync.read(await page.screenshot());
+    stableFrames = predicate(png) ? stableFrames + 1 : 0;
+    if (stableFrames >= 2) {
+      console.log(`[BT3 menu] ${label} verificato in ${Date.now() - startedAt} ms`);
+      return png;
+    }
+    await wait(page, 150);
+  }
+  throw new Error(`${label} non verificato visivamente entro ${Math.round(timeoutMs / 1000)} secondi.`);
+}
+
+async function confirmRosterState(page, action, predicate, label) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await action();
+    try {
+      return await waitForRosterState(page, predicate, label, 2_500);
+    } catch (error) {
+      if (attempt === 3) throw error;
+      console.log(`[BT3 menu] ${label}: conferma ${attempt} non recepita, nuovo tentativo`);
+    }
+  }
+  throw new Error(`${label}: conferma non verificata.`);
 }
 
 /** Seleziona davvero roster, costumi e mappa dal Character Select corrente. */
@@ -364,29 +480,31 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
   };
   const { tap, moveNative, padTap, progress } = createMenuControls(page, onProgress);
 
+  await waitForRosterState(page, hasCharacterSelectionFrame, 'Character Select', 30_000);
   progress(`P1 random: destra ${plan.p1.right}, giù ${plan.p1.down}`);
   await moveNative('ArrowRight', plan.p1.right);
   await moveNative('ArrowDown', plan.p1.down);
-  await tap('k', 400);
-  await wait(page, 2_000);
+  await confirmRosterState(page, () => tap('k', 400), (png) => hasCustomSelectFrame(png, 0), 'Custom Select P1');
 
   progress(`P2 random: destra ${plan.p2.right}, giù ${plan.p2.down}`);
-  for (let index = 0; index < plan.p2.right; index += 1) await padTap('right');
-  for (let index = 0; index < plan.p2.down; index += 1) await padTap('down');
-  await padTap('cross', 400);
-  await wait(page, 3_000);
-  await padTap('cross', 400); // Custom Select → Normal
-  await wait(page, 4_000);
-  await padTap('cross', 400); // Select Color → 1
-  await wait(page, 2_000);
+  for (let index = 0; index < plan.p2.right; index += 1) await padTap('right', 120);
+  for (let index = 0; index < plan.p2.down; index += 1) await padTap('down', 120);
+  await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 1), 'Custom Select P2');
+
+  progress('conferma Normal e colore di P2');
+  await confirmRosterState(page, () => padTap('cross', 400), (png) => hasSelectColorFrame(png, 1), 'Select Color P2');
+  await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1), 'P2 pronto');
 
   progress('conferma Normal e colore di P1');
-  await tap('k', 400);
-  await wait(page, 2_000);
-  await tap('k', 400); // Custom Select → Normal
-  await wait(page, 3_000);
-  await tap('k', 400); // Select Color → 1
-  await wait(page, 4_000);
+  const p1NormalFrame = await confirmRosterState(
+    page,
+    () => tap('k', 400),
+    (png) => hasSelectColorFrame(png, 0) || hasMapSelectionFrame(png),
+    'Normal P1',
+  );
+  if (!hasMapSelectionFrame(p1NormalFrame)) {
+    await confirmRosterState(page, () => tap('k', 400), hasMapSelectionFrame, 'Map Select');
+  }
 
   progress(`stage random: destra ${plan.stage.right}, giù ${plan.stage.down}`);
   await moveNative('ArrowRight', plan.stage.right);
@@ -394,9 +512,8 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
   await tap('k', 400);
 
   progress('download della mappa, shader e introduzione 3D');
-  await wait(page, 5_000);
+  await wait(page, 1_000);
   await waitForColorfulFrame(page, 300_000);
-  await wait(page, 25_000);
   await waitForCombatStart(page);
   await page.evaluate(() => {
     const match = window.marketArena.match;
@@ -405,7 +522,6 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
     window.marketArena.bridge.setMode(0, 'neutral');
     window.marketArena.bridge.setMode(1, 'neutral');
   });
-  await wait(page, 5_000);
   progress('combattimento 3D avviato; controllare la cattura video');
   return plan;
 }
@@ -459,7 +575,6 @@ export async function runRematchSequence(page, options = {}) {
   } else if (hasResultsMenuFrame(confirmationFrame)) {
     throw new Error('Conferma Character Select non recepita: il menu risultati è ancora visibile.');
   }
-  await wait(page, 8_000);
   return rosterSequence(page, options);
 }
 
