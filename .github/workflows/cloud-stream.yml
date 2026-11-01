@@ -56,10 +56,29 @@ jobs:
 
       - name: Run cloud-stream.sh until combat, record to files
         run: |
-          mkdir -p artifacts
+          mkdir -p artifacts/frames
           chmod +x cloud-stream.sh
-          ./cloud-stream.sh 2>&1 | tee artifacts/cloud-stream.log
-          exit "${PIPESTATUS[0]}"
+          # Diagnostica: un fotogramma ridotto di :99 ogni 4 s, nominato con i secondi trascorsi.
+          ( start=$(date +%s); while true; do
+              if [ -S /tmp/.X11-unix/X99 ]; then
+                ffmpeg -v error -y -f x11grab -video_size 1920x1080 -i :99.0 -frames:v 1 -vf scale=320:180 -q:v 7 \
+                  "artifacts/frames/$(printf %04d $(( $(date +%s) - start ))).jpg" || true
+              fi
+              sleep 4
+            done ) &
+          grabber=$!
+          status=0
+          ./cloud-stream.sh > >(tee artifacts/cloud-stream.log) 2>&1 || status=$?
+          kill "$grabber" 2>/dev/null || true
+          exit "$status"
+
+      - name: Publish diagnostic frames
+        if: failure()
+        run: |
+          # Le annotazioni sono pubbliche: gli ultimi fotogrammi in base64 per la diagnosi.
+          for frame in $(ls artifacts/frames/*.jpg 2>/dev/null | tail -n 10); do
+            echo "::notice title=frame $(basename "$frame" .jpg)s::$(base64 -w0 "$frame")"
+          done
 
       - name: Verify 1080p60 video and game audio
         run: |
@@ -78,6 +97,15 @@ jobs:
           max=$(sed -n 's/.*max_volume: \(-\?[0-9.]*\) dB/\1/p' artifacts/volume.txt)
           awk -v m="$max" 'BEGIN { exit !(m > -60) }' || { echo "Audio muto: max_volume ${max} dB"; exit 1; }
           ffmpeg -hide_banner -v error -y -ss 7 -i "$STREAM_RTMP_URL" -frames:v 1 artifacts/dryrun-frame.png
+
+      - name: Compare with the in-page web automation
+        if: always()
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          BT3_SMOKE_HEADFUL=1 BT3_SMOKE_BASE_URL=https://bt-3-market-arena.vercel.app BT3_SMOKE_TIMEOUT=900000 \
+            xvfb-run -a -s "-screen 0 1920x1080x24" node scripts/smokeWeb.mjs --full 2>&1 | tee artifacts/web-smoke.log
+        timeout-minutes: 20
 
       - name: Unit tests on Linux
         if: always()
@@ -101,6 +129,8 @@ jobs:
           # Le annotazioni sono leggibili anche dall'API pubblica, a differenza di log e summary.
           tail_text=$(tail -n 30 artifacts/cloud-stream.log 2>/dev/null | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::notice title=cloud-stream.sh tail::${tail_text}"
+          web_text=$(grep -E 'BT3 menu|BT3 phase|"(status|menuSequence|phase|automationError)"|Error' artifacts/web-smoke.log 2>/dev/null | tail -n 30 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::notice title=web smoke tail::${web_text}"
 
       - uses: actions/upload-artifact@v4
         if: always()
