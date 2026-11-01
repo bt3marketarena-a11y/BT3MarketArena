@@ -86,13 +86,18 @@ jobs:
 
       - name: Summary
         if: always()
+        # Il riepilogo è pubblico anche senza accesso ai log: nel dry-run le destinazioni
+        # sono file locali, quindi il log non contiene stream key.
         run: |
           {
             echo '## Cloud stream dry-run'
-            grep -E 'phase=fighting|Combattimento|menuSequence|Error' artifacts/launcher.log 2>/dev/null | tail -n 5 | sed 's/^/    /' || true
-            for f in artifacts/*.probe.txt; do [ -f "$f" ] && { echo "### $(basename "$f" .probe.txt)"; sed 's/^/    /' "$f"; }; done
-            [ -f artifacts/volume-summary.txt ] && { echo '### Audio'; sed 's/^/    /' artifacts/volume-summary.txt; }
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo '### Ultime righe di cloud-stream.sh'
+            tail -n 40 artifacts/cloud-stream.log 2>/dev/null | sed 's/^/    /'
+            for f in artifacts/*.probe.txt; do
+              if [ -f "$f" ]; then echo "### $(basename "$f" .probe.txt)"; sed 's/^/    /' "$f"; fi
+            done
+            if [ -f artifacts/volume-summary.txt ]; then echo '### Audio'; sed 's/^/    /' artifacts/volume-summary.txt; fi
+          } >> "$GITHUB_STEP_SUMMARY" || true
 
       - uses: actions/upload-artifact@v4
         if: always()
