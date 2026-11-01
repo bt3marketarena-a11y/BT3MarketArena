@@ -120,50 +120,68 @@ test('dopo il menu visibile P2 preme giù e Cross, senza tastiera né Rematch an
   assert.ok(events.indexOf('button:down:true') > events.indexOf('capture:2'));
 });
 
-test('con Map Select già visibile il recovery riprende dalla mappa senza cercare i risultati', async () => {
-  const { runRematchSequence } = await import('../menuDriver.mjs');
-  const map = new PNG({ width: 960, height: 540 });
-  for (let index = 0; index < map.data.length; index += 4) {
-    map.data[index] = 55;
-    map.data[index + 1] = 130;
-    map.data[index + 2] = 65;
-    map.data[index + 3] = 255;
-  }
-  for (let y = 180; y < 340; y += 1) {
-    for (let x = 300; x < 660; x += 1) {
-      const offset = (y * map.width + x) * 4;
-      map.data[offset] = 180;
-      map.data[offset + 1] = 100;
-      map.data[offset + 2] = 35;
+function realMapFrame() {
+  const map = menuFrame(false);
+  const fill = (x0, y0, x1, y1, color) => {
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const offset = (y * map.width + x) * 4;
+        map.data[offset] = color[0];
+        map.data[offset + 1] = color[1];
+        map.data[offset + 2] = color[2];
+      }
     }
-  }
-  for (let y = 30; y < 95; y += 1) {
-    for (let x = 120; x < 390; x += 1) {
-      const offset = (y * map.width + x) * 4;
-      map.data[offset] = 200;
-      map.data[offset + 1] = 90;
-      map.data[offset + 2] = 30;
-    }
-  }
-  const frames = [map, menuFrame(true, 1), menuFrame(false)];
+  };
+  fill(300, 180, 660, 340, [180, 100, 35]);
+  fill(120, 30, 390, 95, [200, 90, 30]);
+  return map;
+}
+
+function recoveryPage(frames) {
   let captures = 0;
   const previousWindow = globalThis.window;
   globalThis.window = { marketArena: { bridge: { setMode: () => {}, setButton: () => {} } } };
-  const page = {
-    screenshot: async () => PNG.sync.write(frames[Math.min(captures++, frames.length - 1)]),
-    waitForTimeout: async () => {},
-    keyboard: { down: async () => {}, up: async () => {} },
-    evaluate: async (fn, arg) => arg ? fn(arg) : undefined,
+  return {
+    captures: () => captures,
+    restore() {
+      if (previousWindow === undefined) delete globalThis.window;
+      else globalThis.window = previousWindow;
+    },
+    page: {
+      screenshot: async () => PNG.sync.write(frames[Math.min(captures++, frames.length - 1)]),
+      waitForTimeout: async () => {},
+      keyboard: { down: async () => {}, up: async () => {} },
+      evaluate: async (fn, arg) => arg ? fn(arg) : undefined,
+    },
   };
+}
+
+test('con Map Select già visibile il recovery riprende dalla mappa senza cercare i risultati', async () => {
+  const { runRematchSequence } = await import('../menuDriver.mjs');
+  const { page, captures, restore } = recoveryPage([realMapFrame(), menuFrame(true, 1), menuFrame(false)]);
   try {
     const result = await runRematchSequence(page, {
       mapSequence: async () => ({ resumed: 'map' }),
       rosterSequence: async () => ({ resumed: 'roster' }),
     });
     assert.deepEqual(result, { resumed: 'map' });
-    assert.equal(captures, 1);
+    assert.equal(captures(), 1);
   } finally {
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
+    restore();
+  }
+});
+
+test('Map Select che appare durante una transizione interrompe subito l’attesa dei risultati', async () => {
+  const { runRematchSequence } = await import('../menuDriver.mjs');
+  const { page, captures, restore } = recoveryPage([menuFrame(false), realMapFrame(), menuFrame(true, 1), characterFrame()]);
+  try {
+    const result = await runRematchSequence(page, {
+      mapSequence: async () => ({ resumed: 'map' }),
+      rosterSequence: async () => ({ resumed: 'roster' }),
+    });
+    assert.deepEqual(result, { resumed: 'map' });
+    assert.equal(captures(), 2);
+  } finally {
+    restore();
   }
 });

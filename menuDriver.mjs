@@ -321,6 +321,8 @@ export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 50
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const png = PNG.sync.read(await page.screenshot());
+    if (hasCharacterSelectionFrame(png)) return 'roster';
+    if (hasConfirmedMapSelectionFrame(png)) return 'map';
     if (hasExitPromptFrame(png)) {
       console.log('[BT3 menu] EXIT? residuo: confermo No e torno al menu dei risultati');
       await confirmExitPromptSelection(page, menuPlayer, 1);
@@ -600,6 +602,14 @@ export async function runRematchSequence(page, options = {}) {
   }
   progress('attesa visiva del menu dei risultati; nessuna conferma anticipata');
   let selected = await waitForResultsMenu(page, { menuPlayer });
+  if (selected === 'roster') {
+    progress('Character Select apparso durante il retry: ripresa immediata del roster');
+    return rosterSequence(page, options);
+  }
+  if (selected === 'map') {
+    progress('Map Select apparsa durante il retry: ripresa immediata della mappa');
+    return mapSequence(page, options);
+  }
   progress(`post-match P${menuPlayer + 1}: dalla voce ${selected + 1} a Character Select`);
   for (let attempt = 0; selected !== 1 && attempt < 12; attempt += 1) {
     const direction = selected > 1 ? 'up' : 'down';
