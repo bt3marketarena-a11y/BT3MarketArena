@@ -550,6 +550,8 @@ async function confirmMapAndCombat(page, plan, { moveNative, tap, progress }) {
   progress(`stage random: destra ${plan.stage.right}, giù ${plan.stage.down}`);
   await moveNative('ArrowRight', plan.stage.right);
   await moveNative('ArrowDown', plan.stage.down);
+  // L'estremo destro è l'icona BGM: una posizione a sinistra conferma sempre uno stage.
+  await moveNative('ArrowLeft', 1);
   await tap('k', 400);
 
   progress('download della mappa, shader e introduzione 3D');

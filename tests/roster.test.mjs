@@ -7,6 +7,7 @@ import {
   hasCustomSelectFrame,
   hasMapSelectionFrame,
   hasSelectColorFrame,
+  runMapSelectionSequence,
   runRosterSequence,
 } from '../menuDriver.mjs';
 
@@ -150,6 +151,46 @@ test('Map Select non viene confuso col roster compatto anche con blu e magenta',
   paint(png, 200, 30, 600, 95, [200, 90, 30]);
   assert.equal(hasCharacterSelectionFrame(png), false);
   assert.equal(hasMapSelectionFrame(png), true);
+});
+
+test('la conferma mappa lascia l’icona BGM con ArrowLeft prima di premere K', async () => {
+  const events = [];
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    __BT3_MARKET_ARENA__: { automationError: null },
+    marketArena: {
+      bridge: { keyboardEvents: true, setButton: () => {}, setMode: () => {} },
+      match: { running: false, start: () => {}, restart: () => {} },
+    },
+  };
+  const map = new PNG({ width: 960, height: 540 });
+  paint(map, 0, 0, 960, 540, [55, 130, 65]);
+  paint(map, 120, 30, 390, 95, [200, 90, 30]);
+  paint(map, 300, 180, 660, 340, [180, 100, 35]);
+  const combat = rosterFrame();
+  paint(combat, 120, 35, 840, 105, [55, 130, 65]);
+  paint(combat, 120, 440, 840, 520, [55, 130, 65]);
+  paint(combat, 170, 18, 410, 45, [50, 220, 70]);
+  paint(combat, 550, 18, 790, 45, [50, 220, 70]);
+  const page = {
+    waitForTimeout: async () => {},
+    keyboard: {
+      down: async () => {},
+      up: async (key) => { events.push(key); },
+    },
+    evaluate: async (fn, arg) => fn(arg),
+    screenshot: async () => PNG.sync.write(events.includes('k') ? combat : map),
+  };
+  try {
+    await runMapSelectionSequence(page, { random: () => 0 });
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+  const mapConfirm = events.indexOf('k');
+  const lastDirection = events.slice(0, mapConfirm).lastIndexOf('ArrowLeft');
+  assert.ok(mapConfirm > 0, 'conferma mappa non inviata');
+  assert.ok(lastDirection >= 0, 'manca ArrowLeft per uscire dall’icona BGM');
 });
 
 test('P2 senza Select Color è già pronto dopo Normal e non riceve altre conferme', async () => {
