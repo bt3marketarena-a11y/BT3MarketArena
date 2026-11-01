@@ -114,7 +114,7 @@ Il `Dockerfile` contiene Node.js, Chromium/Playwright, Xvfb, PulseAudio e FFmpeg
 3. Il normale `launcher.mjs` in modalità headed/kiosk, con `BT3_CLOUD_SYNC=1`.
 4. FFmpeg con `x11grab` a 60 fps, audio PulseAudio, H.264/AAC e destinazione `STREAM_RTMP_URL`.
 
-Nel container il launcher usa il proxy locale con `inject=0`, riservato a questo flusso: evita che il bootstrap web e quello Playwright eseguano due automazioni contemporanee. I timing e la cattura del launcher non cambiano. FFmpeg riprova dopo 5 secondi in caso di disconnessione; se server o launcher terminano, il container esce e il restart policy della piattaforma riavvia l'intero stack.
+Senza `CLOUD_STATE_ORIGIN` il CA della live è quello del `STATE_FILE` locale al container, indipendente dal sito pubblico. Con `-e CLOUD_STATE_ORIGIN=https://bt-3-market-arena.vercel.app` il server del container inoltra `GET/PATCH /api/state` al deploy Vercel (Redis) e risponde 204 su `/api/events`: il launcher resta sul polling da 2 s e un CA salvato da `/admin` su Vercel raggiunge anche YouTube/X. Nel container il launcher usa il proxy locale con `inject=0`, riservato a questo flusso: evita che il bootstrap web e quello Playwright eseguano due automazioni contemporanee. I timing e la cattura del launcher non cambiano. FFmpeg riprova dopo 5 secondi in caso di disconnessione; se server o launcher terminano, il container esce e il restart policy della piattaforma riavvia l'intero stack.
 
 Build ed esecuzione:
 
@@ -124,6 +124,7 @@ docker run -d --name bt3-market-arena --restart unless-stopped \
   -p 3000:3000 \
   -e ADMIN_KEY='sostituisci-con-una-password-lunga' \
   -e STREAM_RTMP_URL='rtmp://PROVIDER/PATH/STREAM_KEY' \
+  -e CLOUD_STATE_ORIGIN='https://bt-3-market-arena.vercel.app' \
   -e STATE_FILE=/app/artifacts/cloud-state.json \
   -v bt3-market-state:/app/artifacts \
   bt3-market-arena
@@ -143,6 +144,7 @@ Su Render/Railway scegli il deploy **Dockerfile**, espone la porta HTTP e config
 | `UPSTREAM_ORIGIN` | No | Default `https://dragonballbt3.online` |
 | `STREAM_RTMP_URL` | Solo streamer | Destinazione RTMP completa, inclusa stream key |
 | `STREAM_RTMP_URL_SECONDARY` | No | Seconda destinazione RTMP (es. X), duplicata con `tee` |
+| `CLOUD_STATE_ORIGIN` | Consigliata per lo streamer | Origine del deploy pubblico (es. `https://bt-3-market-arena.vercel.app`): `/api/state` viene inoltrato lì lato server, così la live segue il CA salvato su Redis |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Consigliate su Vercel | Redis/Upstash per lo stato CA condiviso (alias `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`) |
 | `BT3_CLOUD_SYNC` | Gestita dallo script | `1` nel container per collegare il launcher allo stato condiviso |
 | `BT3_CLOUD_BASE_URL` | Opzionale | Override origine API; normalmente vuota perché same-origin |

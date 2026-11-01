@@ -168,3 +168,29 @@ test('il server web accetta host e porta inoltrati da npm run dev', async () => 
   assert.deepEqual(resolveListenOptions(['--host', '0.0.0.0', '--port', '7100'], {}), { host: '0.0.0.0', port: 7100 });
   assert.deepEqual(resolveListenOptions(['--port=7200'], { PORT: '3000' }), { host: '0.0.0.0', port: 7200 });
 });
+
+test('CLOUD_STATE_ORIGIN inoltra lo stato CA al deploy pubblico lato server', async (t) => {
+  const calls = [];
+  const remote = { source: 'dexscreener', ca: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', revision: 7, storage: 'redis' };
+  const arena = createArenaServer({
+    stateOrigin: 'https://arena.example',
+    bundle: '',
+    fetchImpl: async (url, options = {}) => {
+      calls.push({ url: String(url), method: options.method ?? 'GET', auth: options.headers?.Authorization ?? null });
+      return new Response(JSON.stringify(remote), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  const base = await listen(arena);
+  t.after(() => close(arena));
+  const state = await (await fetch(`${base}/api/state`)).json();
+  assert.equal(state.revision, 7);
+  assert.equal(state.storage, 'redis');
+  const patched = await fetch(`${base}/api/state`, { method: 'PATCH', headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' }, body: '{"source":"simulation"}' });
+  assert.equal(patched.status, 200);
+  const events = await fetch(`${base}/api/events`);
+  assert.equal(events.status, 204, 'senza SSE remoto il client resta sul polling');
+  assert.deepEqual(calls, [
+    { url: 'https://arena.example/api/state', method: 'GET', auth: null },
+    { url: 'https://arena.example/api/state', method: 'PATCH', auth: 'Bearer secret' },
+  ]);
+});

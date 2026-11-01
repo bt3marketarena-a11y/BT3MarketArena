@@ -5,11 +5,13 @@ import { createArenaServer } from './arenaServer.mjs';
 import { findChromeExecutable } from '../launcher.mjs';
 
 const full = process.argv.includes('--full');
-const server = createArenaServer({ adminKey: 'smoke-only-not-retained', stateFile: null });
+// BT3_SMOKE_BASE_URL verifica un deploy pubblico (es. Vercel) invece del proxy locale.
+const remoteBase = process.env.BT3_SMOKE_BASE_URL?.replace(/\/$/, '') ?? '';
+const server = remoteBase ? null : createArenaServer({ adminKey: 'smoke-only-not-retained', stateFile: null });
 let browser;
 try {
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  if (server) await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = remoteBase || `http://127.0.0.1:${server.address().port}`;
   const executablePath = findChromeExecutable();
   browser = await chromium.launch({
     headless: process.env.BT3_SMOKE_HEADFUL !== '1',
@@ -31,7 +33,12 @@ try {
     });
   }
   const errors = [];
+  const network = [];
   let waitError = null;
+  page.on('requestfailed', (request) => network.push(`FAILED ${request.failure()?.errorText} ${request.url().slice(0, 160)}`));
+  page.on('response', (response) => {
+    if (response.status() >= 400) network.push(`HTTP ${response.status()} ${response.url().slice(0, 160)}`);
+  });
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.text().startsWith('[BT3')) console.log(`[browser] ${message.text()}`);
@@ -51,6 +58,9 @@ try {
     automationError: window.__BT3_MARKET_ARENA__?.automationError,
     menuSequence: window.__BT3_MARKET_ARENA__?.menuSequence,
     phase: window.marketArena?.match?.phase,
+    build: window.__BT3_MARKET_ARENA__?.build,
+    cloud: { revision: window.marketArena?.appliedCloudRevision, source: window.marketArena?.config?.source, ca: window.marketArena?.config?.ca },
+    webgl2: Boolean(document.createElement('canvas').getContext('webgl2')),
     hud: Boolean(document.getElementById('broadcast')),
     canvases: document.querySelectorAll('canvas').length,
     pads: [...navigator.getGamepads()].map((pad) => pad && ({ index: pad.index, buttons: pad.buttons.length, axes: pad.axes.length })),
@@ -68,8 +78,11 @@ try {
     return canvas.toDataURL('image/png');
   });
   await mkdir(path.join(process.cwd(), 'artifacts'), { recursive: true });
-  await writeFile(path.join(process.cwd(), 'artifacts', full ? 'cloud-web-combat.png' : 'cloud-web-smoke.png'), Buffer.from(dataUrl.split(',')[1], 'base64'));
-  console.log(JSON.stringify({ diagnostics, errors: errors.slice(0, 20) }, null, 2));
+  const name = `${remoteBase ? 'prod' : 'cloud'}-web-${full ? 'combat' : 'smoke'}`;
+  await writeFile(path.join(process.cwd(), 'artifacts', `${name}.png`), Buffer.from(dataUrl.split(',')[1], 'base64'));
+  // La pagina intera include l'HUD sopra il canvas, assente nei soli pixel WebGL.
+  await page.screenshot({ path: path.join(process.cwd(), 'artifacts', `${name}-page.png`) });
+  console.log(JSON.stringify({ diagnostics, errors: errors.slice(0, 20), network: network.slice(0, 30) }, null, 2));
   if (diagnostics.automationError) throw new Error(diagnostics.automationError);
   if (diagnostics.pads.length !== 2 || diagnostics.pads.some((pad) => !pad || pad.buttons !== 16 || pad.axes !== 4)) throw new Error('Gamepad web non conformi.');
   if (!diagnostics.hud || !diagnostics.frame) throw new Error('HUD o cattura RGBA non disponibili.');
@@ -77,6 +90,8 @@ try {
   if (full && diagnostics.menuSequence !== 'completed') throw new Error('Automazione web non completata.');
 } finally {
   await browser?.close();
-  server.closeAllConnections();
-  await new Promise((resolve) => server.close(resolve));
+  if (server) {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 }

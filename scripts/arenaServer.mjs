@@ -74,7 +74,11 @@ export function createArenaServer({
   bundle = null,
   adminKey = process.env.ADMIN_KEY ?? '',
   stateFile = process.env.VERCEL ? null : process.env.STATE_FILE === undefined ? path.join(process.cwd(), 'artifacts', 'cloud-state.json') : process.env.STATE_FILE || null,
+  // Il container di streaming segue il CA del deploy pubblico (es. Vercel + Redis):
+  // inoltro lato server, così la pagina resta same-origin e senza CORS.
+  stateOrigin = process.env.CLOUD_STATE_ORIGIN ?? '',
 } = {}) {
+  const remoteState = stateOrigin ? new URL('/api/state', stateOrigin).href : '';
   const upstream = new URL(upstreamOrigin);
   if (!['http:', 'https:'].includes(upstream.protocol) || upstream.username || upstream.password) throw new Error('UPSTREAM_ORIGIN non valido.');
   upstreamOrigin = upstream.origin;
@@ -86,6 +90,31 @@ export function createArenaServer({
     const requestUrl = new URL(request.url, 'http://arena.local');
     if (requestUrl.pathname === '/healthz') {
       sendJson(response, 200, { ok: true });
+      return;
+    }
+    if (remoteState && requestUrl.pathname === '/api/events') {
+      // 204 chiude EventSource senza retry: il polling da 2 s del client resta attivo.
+      response.writeHead(204, { 'Cache-Control': 'no-store' });
+      response.end();
+      return;
+    }
+    if (remoteState && requestUrl.pathname === '/api/state') {
+      try {
+        if (!['GET', 'PATCH', 'PUT'].includes(request.method)) { sendJson(response, 405, { error: 'Metodo non consentito.' }); return; }
+        const mutation = request.method !== 'GET';
+        const remote = await fetchImpl(remoteState, {
+          method: request.method,
+          headers: {
+            Accept: 'application/json',
+            ...(mutation ? { 'Content-Type': 'application/json', Authorization: request.headers.authorization ?? `Bearer ${request.headers['x-admin-key'] ?? ''}` } : {}),
+          },
+          ...(mutation ? { body: JSON.stringify(await readJson(request)) } : {}),
+          cache: 'no-store',
+        });
+        sendJson(response, remote.status, await remote.json().catch(() => ({ error: `Stato remoto HTTP ${remote.status}` })));
+      } catch (error) {
+        sendJson(response, 502, { error: `Stato remoto non raggiungibile: ${error.message}` });
+      }
       return;
     }
     if (requestUrl.pathname === '/api/state') {
