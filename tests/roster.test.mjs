@@ -76,6 +76,16 @@ test('Custom Select viene riconosciuto sul lato del rispettivo giocatore', () =>
   assert.equal(hasCharacterSelectionFrame(png), false);
 });
 
+test('tre frammenti scuri sul personaggio non formano un pannello Custom Select', () => {
+  const png = rosterFrame();
+  for (const center of [224, 267, 309]) {
+    paint(png, 160, center - 10, 400, center + 10, [15, 45, 85]);
+    paint(png, 205, center - 5, 355, center + 5, [225, 170, 220]);
+  }
+  assert.equal(hasCustomSelectFrame(png, 0), false);
+  assert.equal(hasCharacterSelectionFrame(png), true);
+});
+
 test('Select Color non viene confuso con le quattro righe di Custom Select', () => {
   const png = rosterFrame();
   addCustomSelect(png, 0);

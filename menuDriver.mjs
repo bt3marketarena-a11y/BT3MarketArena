@@ -143,12 +143,13 @@ function rosterTextCount(png, player, center) {
   return count;
 }
 
-function rosterRowDarkRatio(png, player, center) {
+function rosterRowDarkRatio(png, player, center, halfHeight = 10) {
   const [minX, maxX] = player === 0 ? [0.16, 0.43] : [0.57, 0.84];
   const scaledCenter = center * png.height / 540;
+  const scaledRadius = halfHeight * png.height / 540;
   let samples = 0;
   let dark = 0;
-  for (let y = Math.floor(scaledCenter - 10 * png.height / 540); y <= Math.ceil(scaledCenter + 10 * png.height / 540); y += 3) {
+  for (let y = Math.floor(scaledCenter - scaledRadius); y <= Math.ceil(scaledCenter + scaledRadius); y += 3) {
     for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 4) {
       const offset = (y * png.width + x) * 4;
       const red = png.data[offset];
@@ -170,7 +171,9 @@ function rosterPanelRow(png, player, center) {
 }
 
 export function hasCustomSelectFrame(png, player) {
-  return rosterPanelRow(png, player, 309)
+  // Un pannello reale copre tutta l'area; tre frammenti sul personaggio non bastano.
+  return rosterRowDarkRatio(png, player, 245, 90) > 0.5
+    && rosterPanelRow(png, player, 309)
     && [181, 224, 267].filter((center) => rosterPanelRow(png, player, center)).length >= 2;
 }
 
