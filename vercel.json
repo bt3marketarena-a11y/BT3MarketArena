@@ -8,8 +8,14 @@
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/admin", "destination": "/admin.html" },
     {
-      "source": "/:path((?!$|api(?:/|$)|admin(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$).*)",
+      "source": "/:path((?!$|api(?:/|$)|admin(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$|build-manifest\\.json$).*)",
       "destination": "https://dragonballbt3.online/:path"
     }
+  ],
+  "headers": [
+    { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
+    { "source": "/runtime.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
+    { "source": "/build-manifest.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
+    { "source": "/bt3-arena-bundle.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
   ]
 }

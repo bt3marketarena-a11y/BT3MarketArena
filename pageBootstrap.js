@@ -9,6 +9,7 @@ if (window.top === window && !window[GLOBAL_KEY]) {
     bridge,
     app: null,
     status: 'preloaded',
+    build: document.querySelector('meta[name="bt3-build"]')?.content ?? 'development',
     installedAt: performance.now(),
     error: null,
   };

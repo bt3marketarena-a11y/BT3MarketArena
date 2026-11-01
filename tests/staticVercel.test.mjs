@@ -23,7 +23,7 @@ test('la build Vercel genera home e runtime statici con bundle precompilato', as
   const bundle = await readFile(path.join(directory, 'public', 'bt3-arena-bundle.js'), 'utf8');
   const admin = await readFile(path.join(directory, 'public', 'admin.html'), 'utf8');
   assert.equal(index, runtime);
-  assert.ok(index.indexOf('<script src="/bt3-arena-bundle.js"></script>') < index.indexOf('<script src="/engine.js">'));
+  assert.ok(index.indexOf('<script src="/bt3-arena-bundle.js?v=') < index.indexOf('<script src="/engine.js">'));
   assert.ok(bundle.length > 1000);
   assert.match(admin, /Market Arena/);
 });
@@ -41,5 +41,26 @@ test('la build Vercel usa il fallback HTML locale se upstream è offline', async
   const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
   assert.equal(result.source, 'fallback');
   assert.match(index, /<canvas id="canvas">/);
-  assert.match(index, /<script src="\/bt3-arena-bundle\.js"><\/script>/);
+  assert.match(index, /<script src="\/bt3-arena-bundle\.js\?v=[a-f0-9]{64}"><\/script>/);
+});
+
+test('la build Vercel versiona il bundle e pubblica un manifest verificabile', async (t) => {
+  const directory = await workspace(t);
+  const source = '<!doctype html><html><head><script src="/engine.js"></script></head><body><canvas></canvas></body></html>';
+  await buildStaticVercel({
+    fetchImpl: async () => new Response(source, { status: 200 }),
+    outputDir: path.join(directory, 'public'),
+    fallbackFile: path.join(directory, 'missing-fallback.html'),
+    commit: 'test-commit',
+    builtAt: '2026-11-01T00:00:00.000Z',
+  });
+  const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
+  const bundle = await readFile(path.join(directory, 'public', 'bt3-arena-bundle.js'), 'utf8');
+  const manifest = JSON.parse(await readFile(path.join(directory, 'public', 'build-manifest.json'), 'utf8'));
+  const { createHash } = await import('node:crypto');
+  const hash = createHash('sha256').update(bundle).digest('hex');
+  assert.deepEqual(manifest, { commit: 'test-commit', bundleSha256: hash, builtAt: '2026-11-01T00:00:00.000Z' });
+  assert.ok(index.includes(`/bt3-arena-bundle.js?v=${hash}`));
+  assert.ok(index.includes('<meta name="bt3-build" content="test-commit">'));
+  assert.ok(index.indexOf(`/bt3-arena-bundle.js?v=${hash}`) < index.indexOf('/engine.js'));
 });

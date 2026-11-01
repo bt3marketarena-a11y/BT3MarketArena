@@ -88,4 +88,5 @@ test('il bootstrap installa il bridge prima del montaggio DOM', async () => {
   assert.ok(bootstrap.indexOf('new BT3InputBridge') < bootstrap.indexOf('mountOverlay'));
   assert.match(bootstrap, /const GLOBAL_KEY = '__BT3_MARKET_ARENA__'/);
   assert.match(bootstrap, /window\[GLOBAL_KEY\]/);
+  assert.match(bootstrap, /build: document\.querySelector\('meta\[name="bt3-build"\]'\)\?\.content/);
 });
