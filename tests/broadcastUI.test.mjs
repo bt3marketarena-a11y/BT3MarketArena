@@ -32,3 +32,18 @@ test('il toggle apre e chiude la lista senza cambiare il feed', async () => {
   assert.equal(tradeList.hidden, true);
   assert.equal(feedToggle['aria-expanded'], 'false');
 });
+
+test('la vista spectator nasconde i comandi tastiera e offre un admin touch', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /F2 \/\/ ADMIN|<span>F2<\/span>/);
+  assert.match(html, /id="admin-open"[^>]*aria-label="Open market admin"/);
+  assert.match(html, /id="admin-close"/);
+});
+
+test('il layout mobile usa font leggibili, safe area e target touch', async () => {
+  const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(css, /clamp\(/);
+  assert.match(css, /env\(safe-area-inset-bottom/);
+  assert.match(css, /@media\s*\(max-width:\s*600px\)/);
+  assert.match(css, /\.admin-open\{[^}]*min-width:44px[^}]*min-height:44px/);
+});

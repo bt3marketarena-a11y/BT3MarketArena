@@ -116,6 +116,7 @@ export class BroadcastUI {
           this.openAdmin(callbacks);
         }
       });
+      document.getElementById('admin-open')?.addEventListener('click', () => this.openAdmin());
       this.adminBound = true;
     }
     this.adminCallbacks = callbacks;
@@ -126,16 +127,16 @@ export class BroadcastUI {
       this.adminWindow.focus();
       return;
     }
-    const popup = window.open('', 'BT3MarketArenaAdmin', 'width=560,height=900,resizable=yes,scrollbars=yes');
+    const popup = window.innerWidth <= 600 ? null : window.open('', 'BT3MarketArenaAdmin', 'width=560,height=900,resizable=yes,scrollbars=yes');
     if (!popup) {
       const container = document.getElementById('admin-fallback-content');
       container.replaceChildren(document.getElementById('admin-template').content.cloneNode(true));
       this.wireAdminForm(container.querySelector('form'), callbacks);
-      this.elements.fallback.showModal();
+      if (!this.elements.fallback.open) this.elements.fallback.showModal();
       return;
     }
     popup.document.open();
-    popup.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Market Arena Admin</title><style>${ADMIN_CSS}</style></head><body></body></html>`);
+    popup.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Market Arena Admin</title><style>${ADMIN_CSS}</style></head><body></body></html>`);
     popup.document.close();
     popup.document.body.appendChild(document.getElementById('admin-template').content.cloneNode(true));
     this.wireAdminForm(popup.document.querySelector('form'), callbacks, popup);
@@ -143,6 +144,10 @@ export class BroadcastUI {
   }
 
   wireAdminForm(form, callbacks, popup = null) {
+    form.querySelector('#admin-close')?.addEventListener('click', () => {
+      if (popup) popup.close();
+      else this.elements.fallback.close();
+    });
     for (const [key, value] of Object.entries(this.currentConfig)) {
       if (form.elements[key] && value !== undefined && value !== null) form.elements[key].value = value;
     }

@@ -32,7 +32,7 @@
       </section>
 
       <aside class="trade-feed broadcast-layer" aria-label="Recent trades"><div class="feed-title"><button id="feed-toggle" type="button" aria-expanded="false" aria-controls="trade-list"><span>LIVE IMPACT FEED</span><span class="feed-chevron" aria-hidden="true">▸</span></button><i></i></div><ol id="trade-list" hidden></ol></aside>
-      <footer class="ticker broadcast-layer"><span class="ticker-label">CA</span><code id="ca-ticker">SIMULATION_MODE</code><span class="ticker-separator"></span><span id="source-label">PRE-LAUNCH MARKET SIMULATOR</span><span class="ticker-help">F2 // ADMIN</span></footer>
+      <footer class="ticker broadcast-layer"><span class="ticker-label">CA</span><code id="ca-ticker">SIMULATION_MODE</code><span class="ticker-separator"></span><span id="source-label">PRE-LAUNCH MARKET SIMULATOR</span><button id="admin-open" class="admin-open" type="button" aria-label="Open market admin" title="Market admin">⚙</button></footer>
       <div id="ko-banner" class="ko-banner broadcast-layer" hidden><span>K.O.</span><small>AUTO RANDOMIZING NEXT MATCH</small></div>
     </section>
   </main>
@@ -40,34 +40,35 @@
   <dialog id="admin-fallback" aria-label="Market Arena Admin"><div id="admin-fallback-content"></div></dialog>
   <template id="admin-template">
     <form class="admin-form">
-      <div class="admin-heading"><div><small>DIRECT CONTROL ROOM</small><h1>Market Arena</h1></div><span>F2</span></div>
-      <p class="admin-note">HUD e input sono iniettati nel MAIN world di dragonballbt3.online. Il cambio feed non ricarica il gioco.</p>
-      <label>Sorgente mercato<select name="source"><option value="simulation">Simulazione mercato pre-lancio</option><option value="pumpportal">PumpPortal WebSocket</option><option value="dexscreener">DexScreener API (aggregato)</option><option value="solana">Solana RPC logsSubscribe</option></select></label>
-      <label>Contract Address / Mint<input name="ca" autocomplete="off" spellcheck="false" placeholder="Mint Solana Base58"></label>
+      <div class="admin-heading"><div><small>DIRECT CONTROL ROOM</small><h1>Market Arena</h1></div><button id="admin-close" class="admin-close" type="button" aria-label="Close admin">×</button></div>
+      <p class="admin-note">Change the live market feed without reloading the game or controllers.</p>
+      <label>Market source<select name="source"><option value="simulation">Pre-launch simulation</option><option value="pumpportal">PumpPortal WebSocket</option><option value="dexscreener">DexScreener API (aggregated)</option><option value="solana">Solana RPC logsSubscribe</option></select></label>
+      <label>Contract Address / Mint<input name="ca" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="Solana Base58 mint"></label>
       <label>Whale threshold (USD)<input name="whaleThreshold" type="number" min="1" step="100" value="10000"></label>
-      <label>ADMIN_KEY cloud<input name="adminKey" type="password" autocomplete="off" spellcheck="false" placeholder="Solo per la mutazione remota; non salvata"></label>
-      <div class="admin-actions"><button type="submit" data-action="feed">Collega feed</button><button type="button" class="secondary" data-action="simulation">Simulazione mercato</button></div>
-      <p id="engine-status" class="engine-status">Bridge pre-load installato nel documento reale.</p>
-      <hr>
-      <div class="admin-heading-small">Solana RPC</div>
-      <label>WebSocket RPC<input name="wsUrl" value="wss://api.mainnet-beta.solana.com"></label>
-      <label>HTTP RPC<input name="httpUrl" value="https://api.mainnet-beta.solana.com"></label>
-      <div class="admin-heading-small">Wasm Memory Bridge <span>opzionale</span></div>
-      <p class="admin-note">Offset decimali specifici della build remota. Il cambio round richiede un KO visivo o un timeout positivo.</p>
-      <div class="offset-grid"><label>Fase<input name="phaseOffset" type="number" min="0" placeholder="—"></label><label>HP P1<input name="hp1Offset" type="number" min="0" placeholder="—"></label><label>HP P2<input name="hp2Offset" type="number" min="0" placeholder="—"></label></div>
-      <label>Timeout opzionale round (secondi, 0 = solo KO)<input name="roundDurationSec" type="number" min="0" value="0"></label>
-      <button type="submit" class="secondary wide" data-action="memory">Applica memory bridge</button>
-      <hr>
-      <div class="admin-heading-small">Runtime feature flags</div>
-      <div class="admin-features">
-        <label><input type="checkbox" data-feature="autoMenu" checked> Auto menu</label>
-        <label><input type="checkbox" data-feature="autoRematch" checked> Auto Character Select after KO</label>
-        <label><input type="checkbox" data-feature="cinematicCombat" checked> Cinematic combat</label>
-        <label><input type="checkbox" data-feature="visualKO" checked> Visual KO detection</label>
-      </div>
-      <hr>
-      <div class="admin-heading-small">Test impatti sul motore reale</div>
-      <div class="admin-actions three"><button type="button" class="secondary" data-action="test-buy">BUY test</button><button type="button" class="secondary" data-action="test-sell">SELL test</button><button type="button" class="danger" data-action="test-whale">WHALE test</button></div>
+      <label>Cloud ADMIN_KEY<input name="adminKey" type="password" autocomplete="off" spellcheck="false" placeholder="Used once; never saved"></label>
+      <div class="admin-actions"><button type="submit" data-action="feed">Connect live feed</button><button type="button" class="secondary" data-action="simulation">Use simulation</button></div>
+      <p id="engine-status" class="engine-status">Bridge pre-load installed in the real game document.</p>
+      <details class="admin-advanced"><summary>Advanced settings</summary>
+        <div class="admin-heading-small">Solana RPC</div>
+        <label>WebSocket RPC<input name="wsUrl" value="wss://api.mainnet-beta.solana.com"></label>
+        <label>HTTP RPC<input name="httpUrl" value="https://api.mainnet-beta.solana.com"></label>
+        <div class="admin-heading-small">Wasm Memory Bridge <span>optional</span></div>
+        <p class="admin-note">Build-specific decimal offsets. Round changes require a visual KO or a positive timeout.</p>
+        <div class="offset-grid"><label>Phase<input name="phaseOffset" type="number" min="0" placeholder="—"></label><label>HP P1<input name="hp1Offset" type="number" min="0" placeholder="—"></label><label>HP P2<input name="hp2Offset" type="number" min="0" placeholder="—"></label></div>
+        <label>Optional round timeout (seconds, 0 = KO only)<input name="roundDurationSec" type="number" min="0" value="0"></label>
+        <button type="submit" class="secondary wide" data-action="memory">Apply memory bridge</button>
+        <hr>
+        <div class="admin-heading-small">Runtime feature flags</div>
+        <div class="admin-features">
+          <label><input type="checkbox" data-feature="autoMenu" checked> Auto menu</label>
+          <label><input type="checkbox" data-feature="autoRematch" checked> Auto Character Select after KO</label>
+          <label><input type="checkbox" data-feature="cinematicCombat" checked> Cinematic combat</label>
+          <label><input type="checkbox" data-feature="visualKO" checked> Visual KO detection</label>
+        </div>
+        <hr>
+        <div class="admin-heading-small">Real engine impact tests</div>
+        <div class="admin-actions three"><button type="button" class="secondary" data-action="test-buy">BUY test</button><button type="button" class="secondary" data-action="test-sell">SELL test</button><button type="button" class="danger" data-action="test-whale">WHALE test</button></div>
+      </details>
       <output class="admin-output" aria-live="polite"></output>
     </form>
   </template>

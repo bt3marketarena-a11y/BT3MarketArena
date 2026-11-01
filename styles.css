@@ -14,3 +14,71 @@ canvas{position:fixed!important;inset:0!important;width:100vw!important;height:1
 
 /* Il feed chiuso lascia soltanto una barra; il pulsante è l'unica parte interattiva. */
 .feed-title{margin:0}.feed-title button{display:flex;align-items:center;gap:.55vw;padding:.45vw .65vw;border:1px solid rgba(255,255,255,.18);border-radius:3px;background:rgba(3,7,11,.88);color:#d4dce4;font:700 .6vw/1 ui-monospace,monospace;letter-spacing:.14em;pointer-events:auto;cursor:pointer}.feed-title button:hover,.feed-title button:focus-visible{border-color:var(--green);color:var(--green);outline:none}.feed-chevron{display:inline-block;transition:transform .18s ease}.trade-feed.is-open .feed-chevron{transform:rotate(90deg)}.trade-feed:not(.is-open){max-height:2.2vw;overflow:visible}.trade-feed.is-open{max-height:35vh}#trade-list[hidden]{display:none}.trade-feed.is-open #trade-list{margin-top:.65vw}
+
+/* Spectator UI: dimensioni minime leggibili e controlli touch non invasivi. */
+#broadcast .brand{font-size:clamp(12px,1.25vw,24px)}
+#broadcast .brand-sub{font-size:clamp(10px,.5vw,12px)}
+#broadcast .round-block{font-size:clamp(11px,.75vw,15px)}
+#broadcast .market-block strong{font-size:clamp(18px,1.35vw,28px)}
+#broadcast .metric-label,#broadcast .market-block #market-price{font-size:clamp(11px,.69vw,14px)}
+#broadcast .dominance-head,#broadcast .dominance-values{font-size:clamp(11px,.62vw,14px)}
+#broadcast .dominance-head strong{font-size:clamp(14px,1.05vw,22px)}
+#broadcast #phase-label{font-size:clamp(10px,.56vw,13px)}
+#broadcast .ticker{font-size:clamp(11px,.61vw,14px)}
+#feed-toggle{min-width:44px;min-height:44px;font-size:clamp(11px,.6vw,14px)}
+.trade-feed:not(.is-open){max-height:44px}
+.trade-amount{font-size:clamp(12px,.69vw,16px)}
+.trade-action{font-size:clamp(11px,.59vw,14px)}
+.trade-time{font-size:clamp(10px,.48vw,12px)}
+.admin-open{pointer-events:auto;min-width:44px;min-height:44px;margin-left:auto;border:1px solid rgba(255,255,255,.2);border-radius:6px;background:#101822;color:#dbe5ed;font-size:20px;line-height:1;cursor:pointer}
+.admin-open:hover,.admin-open:focus-visible{border-color:var(--green);color:var(--green);outline:none}
+.topbar{min-height:64px;height:auto;padding-top:8px;padding-bottom:8px}
+#admin-fallback{overflow:auto;overscroll-behavior:contain}
+#admin-fallback .admin-form{display:flex;flex-direction:column;gap:14px;padding:22px}
+#admin-fallback .admin-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#admin-fallback .admin-heading h1{margin:4px 0 0;font-size:24px}
+#admin-fallback .admin-heading small{color:#35f2a0;font-size:10px;letter-spacing:2px}
+#admin-fallback .admin-close{min-width:44px;min-height:44px;border:1px solid #314252;border-radius:6px;background:#1b2936;color:#fff;font-size:28px;cursor:pointer}
+#admin-fallback .admin-note{margin:0;color:#9cadba;font-size:12px;line-height:1.5}
+#admin-fallback label{display:flex;flex-direction:column;gap:6px;color:#c2cdd7;font-size:13px}
+#admin-fallback input,#admin-fallback select,#admin-fallback .admin-form button{min-height:44px;padding:10px 12px;border:1px solid #2a3846;border-radius:6px;background:#101822;color:#edf4fa;font-size:16px}
+#admin-fallback .admin-form button{background:#35f2a0;color:#06120d;font-weight:800;cursor:pointer}
+#admin-fallback .admin-form button.secondary{background:#1b2936;color:#dbe5ed}
+#admin-fallback .admin-form button.danger{background:#ffbd45;color:#201400}
+#admin-fallback .admin-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#admin-fallback .admin-actions.three{grid-template-columns:repeat(3,1fr)}
+#admin-fallback .admin-advanced{display:flex;flex-direction:column;gap:14px;border-top:1px solid #24313e;padding-top:12px}
+#admin-fallback .admin-advanced summary{min-height:44px;color:#dbe5ed;font-weight:700;cursor:pointer}
+#admin-fallback .admin-advanced:not([open]){display:block}
+#admin-fallback .admin-features{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#admin-fallback .admin-features label{flex-direction:row;align-items:center}
+#admin-fallback .admin-features input{min-height:20px;width:20px}
+#admin-fallback .offset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#admin-fallback .engine-status{padding:10px;background:#101822;border-left:2px solid #35f2a0;color:#9cadba;font-size:12px}
+#admin-fallback .admin-output{min-height:20px;color:#35f2a0;font-size:13px}
+#admin-fallback .admin-output.error{color:#ff7188}
+
+@media(max-width:600px){
+  .stage-shade{background:linear-gradient(180deg,transparent 0,transparent 55%,rgba(2,5,9,.2) 68%,rgba(2,5,9,.9) 100%)}
+  .topbar{left:8px;right:8px;bottom:calc(88px + env(safe-area-inset-bottom));height:72px;min-height:72px;padding:8px 10px;display:grid;grid-template-columns:1fr auto;gap:6px 10px}
+  .brand-block{gap:8px}.brand-mark{display:none}#broadcast .brand{font-size:14px}#broadcast .brand-sub{display:none}
+  .round-block{grid-column:1/-1;grid-row:2;justify-content:center;gap:10px}#broadcast .round-block{font-size:11px}.roster-label{display:none}
+  .market-block{grid-column:2;grid-row:1}#broadcast .market-block strong{font-size:18px}#broadcast .metric-label,#broadcast .market-block #market-price{font-size:11px}
+  .dominance{left:8px;right:8px;bottom:calc(172px + env(safe-area-inset-bottom))}
+  .dominance-head{margin-bottom:6px}#broadcast .dominance-head{font-size:11px;letter-spacing:0}#broadcast .dominance-head strong{font-size:14px}#phase-label{display:none}
+  .dominance-track{height:14px}.dominance-values{margin-top:6px}#broadcast .dominance-values{font-size:11px}
+  .trade-feed{left:8px;right:8px;bottom:calc(232px + env(safe-area-inset-bottom));width:auto;max-height:44px}
+  .trade-feed.is-open{max-height:34vh;background:rgba(3,7,11,.94);border-radius:8px;overflow:hidden;pointer-events:auto}
+  .trade-feed.is-open #trade-list{margin-top:4px;max-height:calc(34vh - 52px);overflow-y:auto;pointer-events:auto}
+  #trade-list li{grid-template-columns:88px 1fr;min-height:52px;padding:8px 10px;gap:8px}
+  .trade-amount{font-size:12px}.trade-action{font-size:11px}.trade-time{font-size:10px}
+  .ticker{left:8px;right:8px;bottom:max(12px,env(safe-area-inset-bottom));height:56px;padding:0 8px;gap:8px}
+  #broadcast .ticker{font-size:11px}.ticker code{max-width:42%}.ticker-separator{display:none}#source-label{display:none}
+  .fighters{left:8px;right:8px;bottom:calc(288px + env(safe-area-inset-bottom));grid-template-columns:1fr 28px 1fr;gap:6px}
+  .fighter-line,#broadcast .fighter-line strong{font-size:11px}.pad-tag{display:none}
+  .ko-banner span{font-size:72px}.ko-banner small{max-width:90%;font-size:11px;text-align:center;line-height:1.4}
+  #admin-fallback{width:100%;max-width:none;max-height:88dvh;margin:auto auto 0;border-radius:14px 14px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  #admin-fallback .admin-form{padding:18px 16px}#admin-fallback .admin-actions.three{grid-template-columns:1fr}
+}
+
+@media(prefers-reduced-motion:reduce){.feed-chevron{transition:none}}
