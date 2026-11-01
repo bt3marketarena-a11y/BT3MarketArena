@@ -102,3 +102,51 @@ test('dopo il menu visibile P2 preme giù e Cross, senza tastiera né Rematch an
   assert.deepEqual(buttons, [[1, 'down', true], [1, 'down', false], [1, 'cross', true], [1, 'cross', false]]);
   assert.ok(events.indexOf('button:down:true') > events.indexOf('capture:2'));
 });
+
+test('con Map Select già visibile il recovery riprende dalla mappa senza cercare i risultati', async () => {
+  const { runRematchSequence } = await import('../menuDriver.mjs');
+  const map = new PNG({ width: 960, height: 540 });
+  for (let index = 0; index < map.data.length; index += 4) {
+    map.data[index] = 55;
+    map.data[index + 1] = 130;
+    map.data[index + 2] = 65;
+    map.data[index + 3] = 255;
+  }
+  for (let y = 180; y < 340; y += 1) {
+    for (let x = 300; x < 660; x += 1) {
+      const offset = (y * map.width + x) * 4;
+      map.data[offset] = 180;
+      map.data[offset + 1] = 100;
+      map.data[offset + 2] = 35;
+    }
+  }
+  for (let y = 30; y < 95; y += 1) {
+    for (let x = 120; x < 390; x += 1) {
+      const offset = (y * map.width + x) * 4;
+      map.data[offset] = 200;
+      map.data[offset + 1] = 90;
+      map.data[offset + 2] = 30;
+    }
+  }
+  const frames = [map, menuFrame(true, 1), menuFrame(false)];
+  let captures = 0;
+  const previousWindow = globalThis.window;
+  globalThis.window = { marketArena: { bridge: { setMode: () => {}, setButton: () => {} } } };
+  const page = {
+    screenshot: async () => PNG.sync.write(frames[Math.min(captures++, frames.length - 1)]),
+    waitForTimeout: async () => {},
+    keyboard: { down: async () => {}, up: async () => {} },
+    evaluate: async (fn, arg) => arg ? fn(arg) : undefined,
+  };
+  try {
+    const result = await runRematchSequence(page, {
+      mapSequence: async () => ({ resumed: 'map' }),
+      rosterSequence: async () => ({ resumed: 'roster' }),
+    });
+    assert.deepEqual(result, { resumed: 'map' });
+    assert.equal(captures, 1);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});

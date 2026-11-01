@@ -186,9 +186,10 @@ export function hasSelectColorFrame(png, player) {
 
 function hasMapHeaderFrame(png) {
   let title = 0;
-  // Il titolo arancione Map Select distingue cielo e riquadri della mappa dal roster.
+  // Il titolo Map Select occupa il lato sinistro; la freccia arancione
+  // centrale del Character Select non deve essere considerata un titolo.
   for (let y = Math.floor(png.height * 0.055); y < Math.ceil(png.height * 0.18); y += 2) {
-    for (let x = Math.floor(png.width * 0.12); x < Math.ceil(png.width * 0.66); x += 2) {
+    for (let x = Math.floor(png.width * 0.12); x < Math.ceil(png.width * 0.43); x += 2) {
       const offset = (y * png.width + x) * 4;
       const red = png.data[offset];
       const green = png.data[offset + 1];
@@ -220,8 +221,10 @@ export function hasCharacterSelectionFrame(png) {
       if (red > 100 && blueChannel > 60 && red > green * 1.5 && blueChannel > green * 1.3) magenta += 1;
     }
   }
-  // Nei viewport compatti la seconda riga del roster può produrre solo 16 campioni.
-  return blue > 30 && magenta > 10 && !hasMapHeaderFrame(png)
+  // Nei viewport compatti la seconda riga può sparire: i nomi dei due
+  // lottatori restano un segnale specifico del Character Select.
+  const nameplate = [0, 1].some((player) => rosterPanelRow(png, player, 309));
+  return blue > 30 && (magenta > 10 || nameplate) && !hasMapHeaderFrame(png)
     && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
 }
 
@@ -536,6 +539,10 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
     await confirmRosterState(page, () => tap('k', 400), hasMapSelectionFrame, 'Map Select');
   }
 
+  return confirmMapAndCombat(page, plan, { moveNative, tap, progress });
+}
+
+async function confirmMapAndCombat(page, plan, { moveNative, tap, progress }) {
   progress(`stage random: destra ${plan.stage.right}, giù ${plan.stage.down}`);
   await moveNative('ArrowRight', plan.stage.right);
   await moveNative('ArrowDown', plan.stage.down);
@@ -557,11 +564,25 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
   return plan;
 }
 
+function hasConfirmedMapSelectionFrame(png) {
+  return hasMapHeaderFrame(png) && hasMapSelectionFrame(png);
+}
+
+/** Riprende da una mappa già aperta dopo un errore nella selezione precedente. */
+export async function runMapSelectionSequence(page, { random = Math.random, onProgress = () => {} } = {}) {
+  const randomInt = (min, max) => min + Math.floor(random() * (max - min + 1));
+  const plan = { stage: { right: randomInt(1, 6), down: randomInt(0, 2) } };
+  const controls = createMenuControls(page, onProgress);
+  await waitForRosterState(page, hasConfirmedMapSelectionFrame, 'Map Select', 30_000);
+  return confirmMapAndCombat(page, plan, controls);
+}
+
 /** Dopo KO/timeout naviga dalla voce realmente evidenziata a Character Select. */
 export async function runRematchSequence(page, options = {}) {
   const { tap, padTap, progress } = createMenuControls(page, options.onProgress ?? (() => {}));
   let menuPlayer = options.menuPlayer === 0 ? 0 : 1;
   const rosterSequence = options.rosterSequence ?? runRosterSequence;
+  const mapSequence = options.mapSequence ?? runMapSelectionSequence;
   await page.evaluate(() => {
     window.marketArena.bridge.setMode(0, 'idle');
     window.marketArena.bridge.setMode(1, 'idle');
@@ -571,6 +592,10 @@ export async function runRematchSequence(page, options = {}) {
   if (hasCharacterSelectionFrame(recoveryFrame)) {
     progress('Character Select già visibile: ripresa diretta del roster, senza cercare i risultati');
     return rosterSequence(page, options);
+  }
+  if (hasConfirmedMapSelectionFrame(recoveryFrame)) {
+    progress('Map Select già visibile: ripresa diretta della mappa, senza cercare i risultati');
+    return mapSequence(page, options);
   }
   progress('attesa visiva del menu dei risultati; nessuna conferma anticipata');
   let selected = await waitForResultsMenu(page, { menuPlayer });

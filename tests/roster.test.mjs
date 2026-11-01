@@ -67,6 +67,16 @@ test('il roster resta valido quando il viewport compatto espone solo 16 campioni
   assert.equal(hasCharacterSelectionFrame(png), true);
 });
 
+test('il roster senza magenta usa i nomi dei lottatori e non diventa Map Select', () => {
+  const png = rosterFrame();
+  paint(png, 120, 440, 840, 520, [55, 130, 65]);
+  paint(png, 450, 30, 560, 95, [200, 90, 30]);
+  paint(png, 160, 299, 400, 319, [15, 45, 85]);
+  paint(png, 205, 304, 355, 314, [225, 170, 220]);
+  assert.equal(hasCharacterSelectionFrame(png), true);
+  assert.equal(hasMapSelectionFrame(png), false);
+});
+
 test('Custom Select viene riconosciuto sul lato del rispettivo giocatore', () => {
   const png = rosterFrame();
   addCustomSelect(png, 0);
