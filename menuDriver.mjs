@@ -234,7 +234,7 @@ export function hasResultsMenuFrame(png) {
   const left = darkPanelRatio(png, 0.18, 0.28);
   const right = darkPanelRatio(png, 0.72, 0.82);
   const replayRows = brightRowTextCount(png, 342) > 20 && brightRowTextCount(png, 371) > 20;
-  return darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35 && replayRows;
+  return !hasActiveCombatFrame(png) && darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35 && replayRows;
 }
 
 export function hasExitPromptFrame(png) {

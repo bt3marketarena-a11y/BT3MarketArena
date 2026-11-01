@@ -103,3 +103,18 @@ test('destroy chiude anche la sottoscrizione SSE', () => {
   Orchestrator.prototype.destroy.call(fake);
   assert.equal(closed, true);
 });
+
+test('il feed non riattiva i pad mentre il monitor ha bloccato gli input', () => {
+  const modes = [];
+  const fake = {
+    inputLocked: true,
+    match: { phase: 'fighting' },
+    ui: { addTrade: () => {}, updatePressure: () => {} },
+    bridge: { setMode: (...args) => modes.push(args) },
+    window: { setTimeout: () => { throw new Error('Non deve programmare attacchi durante il KO.'); } },
+  };
+  Orchestrator.prototype.handleTrade.call(fake, {
+    side: 'BUY', amountUsd: 50_000, kind: 'whale',
+  }, {});
+  assert.deepEqual(modes, []);
+});

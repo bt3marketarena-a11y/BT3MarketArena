@@ -24,6 +24,7 @@ export class Orchestrator {
     this.bridge.setCinematicCombat?.(this.features.cinematicCombat);
     this.engineStatus = 'MAIN-world pre-load attivo: 2 gamepad, GamepadEvent e doppio canale KeyboardEvent sul motore reale.';
     this.overrideTimer = null;
+    this.inputLocked = false;
     this.memoryTimer = null;
     this.memoryBridge = null;
     this.lastMemoryHp = null;
@@ -193,7 +194,7 @@ export class Orchestrator {
   handleTrade(trade, snapshot) {
     this.ui.addTrade(trade);
     this.ui.updatePressure(snapshot);
-    if (this.match.phase !== 'fighting') return;
+    if (this.match.phase !== 'fighting' || this.inputLocked) return;
     const attacker = trade.side === 'BUY' ? 0 : 1;
     const defender = 1 - attacker;
     const macro = trade.kind === 'whale' ? 'ultimateFinal' : trade.amountUsd >= 1_500 ? 'blast2' : 'rushCombo';
@@ -201,7 +202,7 @@ export class Orchestrator {
     this.bridge.setMode(defender, 'vulnerable');
     clearTimeout(this.overrideTimer);
     this.overrideTimer = this.window.setTimeout(() => {
-      if (this.match.phase !== 'fighting') return;
+      if (this.match.phase !== 'fighting' || this.inputLocked) return;
       this.bridge.setMode(0, 'neutral');
       this.bridge.setMode(1, 'neutral');
     }, trade.kind === 'whale' ? 4_800 : macro === 'blast2' ? 2_200 : 1_100);
@@ -218,6 +219,7 @@ export class Orchestrator {
 
   resetMatch() {
     this.lastMemoryHp = null;
+    this.inputLocked = false;
     this.bridge.setMode(0, 'neutral');
     this.bridge.setMode(1, 'neutral');
   }

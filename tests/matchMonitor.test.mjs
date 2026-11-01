@@ -139,6 +139,7 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
   let waits = 0;
   let stateReads = 0;
   const notifyAt = [];
+  const inputLocksAt = [];
   const frames = [combat, combat, results];
   const page = {
     isClosed: () => closed,
@@ -150,6 +151,7 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
     keyboard: { down: () => {}, up: () => {} },
     evaluate: async (fn) => {
       if (fn.toString().includes('notifyKO')) notifyAt.push(captures);
+      if (fn.toString().includes('inputLocked = true')) inputLocksAt.push(captures);
       stateReads += 1;
       if (stateReads === 1 || fn.toString().includes("phase: window.marketArena")) {
         return { phase: 'fighting', round: 1, durationMs: 0, features: { autoRematch: true, visualKO: true } };
@@ -163,4 +165,5 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
     Date.now = originalNow;
   }
   assert.deepEqual(notifyAt, [3]);
+  assert.deepEqual(inputLocksAt, [2, 3], 'il blocco deve precedere il menu finale e restare attivo sui risultati');
 });

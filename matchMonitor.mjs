@@ -49,6 +49,7 @@ export async function monitorPostMatch(page, {
           koDetector.reset();
           koPending = false;
           await page.evaluate(() => {
+            window.marketArena.inputLocked = true;
             window.marketArena.bridge.setMode(0, 'idle');
             window.marketArena.bridge.setMode(1, 'idle');
             window.marketArena.match.notifyKO(null, 'visual-results-menu');
@@ -65,6 +66,7 @@ export async function monitorPostMatch(page, {
           koPending = false;
           if (!inputsSuspended) {
             await page.evaluate(() => {
+              window.marketArena.inputLocked = true;
               window.marketArena.bridge.setMode(0, 'idle');
               window.marketArena.bridge.setMode(1, 'idle');
             });
@@ -86,6 +88,7 @@ export async function monitorPostMatch(page, {
         if (koPending) {
           if (!inputsSuspended) {
             await page.evaluate(() => {
+              window.marketArena.inputLocked = true;
               window.marketArena.bridge.setMode(0, 'idle');
               window.marketArena.bridge.setMode(1, 'idle');
             });
@@ -97,6 +100,7 @@ export async function monitorPostMatch(page, {
         if (activeCombat) {
           if (inputsSuspended) {
             await page.evaluate(() => {
+              window.marketArena.inputLocked = false;
               window.marketArena.bridge.setMode(0, 'neutral');
               window.marketArena.bridge.setMode(1, 'neutral');
             });
@@ -105,6 +109,7 @@ export async function monitorPostMatch(page, {
         } else if (!inputsSuspended && endDetector.missingSince !== null && Date.now() - endDetector.missingSince >= 2_000) {
           console.log('[BT3 round] timer assente: pad sospesi, ma nessun KO senza il menu finale');
           await page.evaluate(() => {
+            window.marketArena.inputLocked = true;
             window.marketArena.bridge.setMode(0, 'idle');
             window.marketArena.bridge.setMode(1, 'idle');
           });
@@ -125,6 +130,7 @@ export async function monitorPostMatch(page, {
         console.log('[BT3 round] nuove HP e timer già visibili: sincronizzo HUD e pad');
         await page.evaluate(() => {
           window.marketArena.match.restart();
+          window.marketArena.inputLocked = false;
           window.marketArena.bridge.setMode(0, 'neutral');
           window.marketArena.bridge.setMode(1, 'neutral');
           window.__BT3_MARKET_ARENA__.automationError = null;

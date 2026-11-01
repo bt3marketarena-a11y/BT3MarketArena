@@ -88,6 +88,12 @@ test('il menu pausa a quattro voci non viene scambiato per il menu finale', () =
   assert.equal(hasResultsMenuFrame(png), false);
 });
 
+test('un pattern a sei voci con il timer ancora visibile non dichiara il KO', () => {
+  const png = resultsFrame();
+  paint(png, 460, 14, 500, 45, [240, 240, 240]);
+  assert.equal(hasResultsMenuFrame(png), false);
+});
+
 test('la selezione Character Select viene letta senza assumere Fight Again', () => {
   for (const selected of [0, 1, 3, 5]) {
     assert.equal(readResultsMenuSelection(resultsFrame(selected)), selected);
