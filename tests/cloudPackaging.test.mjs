@@ -44,3 +44,11 @@ test('il launcher attiva il client cloud solo quando richiesto dal container', a
   assert.match(launcher, /BT3_CLOUD_SYNC === '1'/);
   assert.match(launcher, /BT3_CLOUD_BASE_URL/);
 });
+
+test('il dry-run limita durata e ritardo senza cambiare la diretta continua', async () => {
+  const script = await read('cloud-stream.sh');
+  assert.match(script, /STREAM_START_DELAY_SEC:-0/);
+  assert.match(script, /STREAM_DURATION_SEC:-0/);
+  assert.match(script, /DURATION_ARGS=\( -t "\$STREAM_DURATION_SEC" \)/);
+  assert.match(script, /if \(\( STREAM_DURATION_SEC > 0 \)\); then\s+status=0; wait "\$FFMPEG_PID" \|\| status=\$\?\s+exit "\$status"/);
+});

@@ -1,0 +1,109 @@
+# Verifica cloud dello streamer: esegue cloud-stream.sh in una VM Ubuntu isolata
+# (Xvfb + PulseAudio + Chromium + FFmpeg), registra il combattimento su file invece
+# che su RTMP e controlla con ffprobe video 1080p60 e audio del gioco.
+# Non trasmette verso YouTube/X e non usa secret: è un test, non una diretta.
+name: Cloud stream dry-run
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_wait_sec:
+        description: Attesa massima del combattimento (secondi)
+        default: '1200'
+      duration_sec:
+        description: Durata della registrazione (secondi)
+        default: '15'
+  push:
+    branches: [main]
+    paths:
+      - cloud-stream.sh
+      - .github/workflows/cloud-stream.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-stream-dry-run
+  cancel-in-progress: true
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUD_STATE_ORIGIN: https://bt-3-market-arena.vercel.app
+      STREAM_RTMP_URL: artifacts/dryrun-primary.flv
+      STREAM_RTMP_URL_SECONDARY: artifacts/dryrun-secondary.flv
+      STREAM_WAIT_FOR_FIGHTING: '1'
+      STREAM_START_DELAY_SEC: ${{ inputs.max_wait_sec || '1200' }}
+      STREAM_DURATION_SEC: ${{ inputs.duration_sec || '15' }}
+      STATE_FILE: ''
+      LAUNCHER_LOG: artifacts/launcher.log
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb pulseaudio ffmpeg
+          npx playwright install --with-deps chromium
+
+      - name: Run cloud-stream.sh until combat, record to files
+        run: |
+          mkdir -p artifacts
+          chmod +x cloud-stream.sh
+          ./cloud-stream.sh 2>&1 | tee artifacts/cloud-stream.log
+          exit "${PIPESTATUS[0]}"
+
+      - name: Verify 1080p60 video and game audio
+        run: |
+          set -euo pipefail
+          for file in "$STREAM_RTMP_URL" "$STREAM_RTMP_URL_SECONDARY"; do
+            echo "== $file"
+            ffprobe -v error -show_entries stream=codec_type,codec_name,width,height,avg_frame_rate,sample_rate,channels:format=duration -of default=nw=1 "$file" | tee "$file.probe.txt"
+            grep -qx 'codec_name=h264' "$file.probe.txt"
+            grep -qx 'width=1920' "$file.probe.txt"
+            grep -qx 'height=1080' "$file.probe.txt"
+            grep -qx 'avg_frame_rate=60/1' "$file.probe.txt"
+            grep -qx 'codec_name=aac' "$file.probe.txt"
+          done
+          ffmpeg -hide_banner -nostats -i "$STREAM_RTMP_URL" -map 0:a -af volumedetect -f null - 2> artifacts/volume.txt
+          grep -E 'mean_volume|max_volume' artifacts/volume.txt | tee artifacts/volume-summary.txt
+          max=$(sed -n 's/.*max_volume: \(-\?[0-9.]*\) dB/\1/p' artifacts/volume.txt)
+          awk -v m="$max" 'BEGIN { exit !(m > -60) }' || { echo "Audio muto: max_volume ${max} dB"; exit 1; }
+          ffmpeg -hide_banner -v error -y -ss 7 -i "$STREAM_RTMP_URL" -frames:v 1 artifacts/dryrun-frame.png
+
+      - name: Unit tests on Linux
+        if: always()
+        continue-on-error: true
+        run: npm test
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Cloud stream dry-run'
+            grep -E 'phase=fighting|Combattimento|menuSequence|Error' artifacts/launcher.log 2>/dev/null | tail -n 5 | sed 's/^/    /' || true
+            for f in artifacts/*.probe.txt; do [ -f "$f" ] && { echo "### $(basename "$f" .probe.txt)"; sed 's/^/    /' "$f"; }; done
+            [ -f artifacts/volume-summary.txt ] && { echo '### Audio'; sed 's/^/    /' artifacts/volume-summary.txt; }
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cloud-stream-dry-run
+          path: |
+            artifacts/dryrun-primary.flv
+            artifacts/dryrun-secondary.flv
+            artifacts/dryrun-frame.png
+            artifacts/dragonballbt3-*.png
+            artifacts/*.log
+            artifacts/*.txt
+          if-no-files-found: warn
+          retention-days: 7
