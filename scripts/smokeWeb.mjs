@@ -61,6 +61,14 @@ try {
     build: window.__BT3_MARKET_ARENA__?.build,
     cloud: { revision: window.marketArena?.appliedCloudRevision, source: window.marketArena?.config?.source, ca: window.marketArena?.config?.ca },
     webgl2: Boolean(document.createElement('canvas').getContext('webgl2')),
+    // Contatori del runtime originale (nascosti in onda): velocità della simulazione e FPS.
+    renderer: (() => {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      const info = gl?.getExtension('WEBGL_debug_renderer_info');
+      return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : null;
+    })(),
+    labSpeed: document.getElementById('lab-speed')?.textContent ?? null,
+    presentFps: document.getElementById('hud')?.textContent ?? null,
     hud: Boolean(document.getElementById('broadcast')),
     canvases: document.querySelectorAll('canvas').length,
     pads: [...navigator.getGamepads()].map((pad) => pad && ({ index: pad.index, buttons: pad.buttons.length, axes: pad.axes.length })),

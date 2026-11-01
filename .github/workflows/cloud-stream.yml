@@ -129,7 +129,7 @@ jobs:
           # Le annotazioni sono leggibili anche dall'API pubblica, a differenza di log e summary.
           tail_text=$(tail -n 30 artifacts/cloud-stream.log 2>/dev/null | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::notice title=cloud-stream.sh tail::${tail_text}"
-          web_text=$(grep -E 'BT3 menu|BT3 phase|"(status|menuSequence|phase|automationError)"|Error' artifacts/web-smoke.log 2>/dev/null | tail -n 30 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          web_text=$(grep -E 'BT3 menu|BT3 phase|"(status|menuSequence|phase|renderer|labSpeed|presentFps)"' artifacts/web-smoke.log 2>/dev/null | tail -n 30 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
           echo "::notice title=web smoke tail::${web_text}"
 
       - uses: actions/upload-artifact@v4
