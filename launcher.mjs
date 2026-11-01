@@ -4,7 +4,6 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runMenuSequence } from './menuDriver.mjs';
-import { captureGameFrame } from './screenCapture.mjs';
 import { createInjectionBundle } from './injectionBundle.mjs';
 import { monitorPostMatch as monitorSharedPostMatch } from './matchMonitor.mjs';
 
@@ -13,9 +12,17 @@ export const TARGET_URL = process.env.BT3_TARGET_URL ?? 'https://dragonballbt3.o
 
 export { createInjectionBundle };
 
+// Pagina con finestra coperta o in secondo piano: senza questi flag Chromium la
+// considera nascosta, ferma requestAnimationFrame e il gioco perde gli input dei menu.
+export const BACKGROUND_FLAGS = Object.freeze([
+  '--disable-background-timer-throttling',
+  '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows',
+]);
+
+// Solo i pixel della pagina (Playwright), mai lo schermo del sistema operativo.
 export async function monitorPostMatch(page) {
-  const monitorPath = path.join(ROOT, 'artifacts', 'live-monitor.png');
-  return monitorSharedPostMatch(page, { capture: (targetPage) => captureGameFrame(targetPage, monitorPath) });
+  return monitorSharedPostMatch(page, { capture: (targetPage) => targetPage.screenshot() });
 }
 
 export function findChromeExecutable() {
@@ -85,6 +92,7 @@ export async function launchArena({ headless = process.env.BT3_HEADLESS === '1',
       '--window-position=0,0', '--window-size=1920,1080',
       '--no-first-run', '--no-default-browser-check', '--autoplay-policy=no-user-gesture-required',
       '--disable-features=Translate,MediaRouter', '--hide-crash-restore-bubble',
+      ...BACKGROUND_FLAGS,
     ],
   });
   const browser = context.browser();

@@ -546,7 +546,7 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
       || (hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1)),
     'Normal P2',
   );
-  if (hasSelectColorFrame(p2NormalFrame)) {
+  if (hasSelectColorFrame(p2NormalFrame, 1)) {
     await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1), 'P2 pronto');
   }
 

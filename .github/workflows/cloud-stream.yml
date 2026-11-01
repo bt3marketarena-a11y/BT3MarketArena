@@ -13,11 +13,6 @@ on:
       duration_sec:
         description: Durata della registrazione (secondi)
         default: '15'
-  push:
-    branches: [main]
-    paths:
-      - cloud-stream.sh
-      - .github/workflows/cloud-stream.yml
 
 permissions:
   contents: read

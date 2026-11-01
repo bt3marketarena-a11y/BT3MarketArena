@@ -59,7 +59,8 @@ test('il monitor rileva la fine match e il launcher conserva la cattura Windows'
   assert.match(monitor, /endDetector\.reset\(\)/);
   assert.match(monitor, /KnockoutDetector/);
   assert.match(monitor, /readCombatHealth/);
-  assert.match(launcher, /captureGameFrame/);
+  assert.doesNotMatch(launcher, /screenCapture|CopyFromScreen|gdigrab/, 'il launcher non legge mai lo schermo del sistema');
+  assert.match(launcher, /--disable-backgrounding-occluded-windows/);
   assert.match(monitor, /notifyKO\(null, 'visual-results-menu'\)/);
   assert.match(monitor, /features\.visualKO/);
   assert.match(monitor, /features\.autoRematch/);
