@@ -492,9 +492,17 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
   for (let index = 0; index < plan.p2.down; index += 1) await padTap('down', 120);
   await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 1), 'Custom Select P2');
 
-  progress('conferma Normal e colore di P2');
-  await confirmRosterState(page, () => padTap('cross', 400), (png) => hasSelectColorFrame(png, 1), 'Select Color P2');
-  await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1), 'P2 pronto');
+  progress('conferma Normal ed eventuale colore di P2');
+  const p2NormalFrame = await confirmRosterState(
+    page,
+    () => padTap('cross', 400),
+    (png) => hasSelectColorFrame(png, 1)
+      || (hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1)),
+    'Normal P2',
+  );
+  if (hasSelectColorFrame(p2NormalFrame)) {
+    await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1), 'P2 pronto');
+  }
 
   progress('conferma Normal e colore di P1');
   const p1NormalFrame = await confirmRosterState(

@@ -123,6 +123,64 @@ test('Map Select è colorato e non contiene più roster o pannelli colore', () =
   assert.equal(hasMapSelectionFrame(rosterFrame()), false);
 });
 
+test('P2 senza Select Color è già pronto dopo Normal e non riceve altre conferme', async () => {
+  const events = [];
+  const states = [];
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    marketArena: {
+      bridge: {
+        keyboardEvents: true,
+        setButton: (player, button, pressed) => {
+          if (player === 1 && button === 'cross' && !pressed) events.push({ type: 'button', value: 'cross' });
+        },
+        setMode: () => {},
+      },
+      match: { running: false, start: () => {}, restart: () => {} },
+    },
+  };
+  const count = (type, value) => events.filter((event) => event.type === type && event.value === value).length;
+  const page = {
+    waitForTimeout: async () => {},
+    keyboard: {
+      down: async () => {},
+      up: async (key) => { events.push({ type: 'key', value: key }); },
+    },
+    evaluate: async (fn, arg) => fn(arg),
+    screenshot: async () => {
+      const p1 = Math.max(0, count('key', 'k') - 1);
+      const p2 = count('button', 'cross');
+      const png = rosterFrame();
+      if (p1 === 1 && p2 >= 0) { addCustomSelect(png, 0); states.push('custom:p1'); }
+      if (p1 === 1 && p2 === 1) { addCustomSelect(png, 1); states.push('custom:both'); }
+      if (p1 === 2 && p2 >= 2) {
+        const map = new PNG({ width: 960, height: 540 });
+        paint(map, 0, 0, 960, 540, [55, 130, 65]);
+        paint(map, 300, 180, 660, 340, [180, 100, 35]);
+        states.push('map');
+        return PNG.sync.write(map);
+      }
+      if (p1 >= 3) {
+        paint(png, 120, 35, 840, 105, [55, 130, 65]);
+        paint(png, 120, 440, 840, 520, [55, 130, 65]);
+        paint(png, 170, 18, 410, 45, [50, 220, 70]);
+        paint(png, 550, 18, 790, 45, [50, 220, 70]);
+        states.push('combat');
+      }
+      return PNG.sync.write(png);
+    },
+  };
+  try {
+    await runRosterSequence(page, { random: () => 0 });
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+  assert.ok(states.includes('map'), `mappa non raggiunta: ${states.join(', ')}`);
+  assert.ok(states.includes('combat'), `combattimento non raggiunto: ${states.join(', ')}`);
+  assert.equal(count('button', 'cross'), 2);
+});
+
 test('il percorso roster attende ogni stato visivo e non usa le lunghe attese fisse', async () => {
   const events = [];
   const states = [];
