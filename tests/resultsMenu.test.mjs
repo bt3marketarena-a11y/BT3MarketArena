@@ -151,6 +151,60 @@ test('EXIT viene chiuso su No prima di leggere il menu risultati', async () => {
   }
 });
 
+test('EXIT residuo di P1 con P2 stimato: Cross non chiude, il driver verifica e conferma No con K', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const closed = events.some((event) => event.type === 'key' && event.args[0] === 'k' && !event.args[1]);
+    return PNG.sync.write(closed ? resultsFrame(1) : exitFrame(1));
+  }, events);
+  try {
+    const selected = await waitForResultsMenu(page, { menuPlayer: 1, timeoutMs: 5_000, pollMs: 0 });
+    assert.equal(selected, 1);
+    assert.deepEqual(events.map((event) => [event.type, ...event.args.slice(0, 3)]), [
+      ['button', 1, 'cross', true], ['button', 1, 'cross', false],
+      ['key', 'k', true], ['key', 'k', false],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+test('EXIT residuo su Yes viene portato su No e verificato prima della conferma', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const released = (name) => events.some((event) => event.type === 'button' && event.args[1] === name && !event.args[2]);
+    if (released('cross')) return PNG.sync.write(resultsFrame(1));
+    return PNG.sync.write(exitFrame(released('down') ? 1 : 0));
+  }, events);
+  try {
+    const selected = await waitForResultsMenu(page, { menuPlayer: 1, timeoutMs: 5_000, pollMs: 0 });
+    assert.equal(selected, 1);
+    assert.deepEqual(events.filter((event) => event.type === 'button').map((event) => event.args), [
+      [1, 'down', true], [1, 'down', false],
+      [1, 'cross', true], [1, 'cross', false],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+test('se nessun pad chiude EXIT il driver si ferma dopo una sola conferma per pad', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => PNG.sync.write(exitFrame(1)), events);
+  try {
+    await assert.rejects(
+      waitForResultsMenu(page, { menuPlayer: 1, timeoutMs: 5_000, pollMs: 0 }),
+      /EXIT non chiuso/,
+    );
+    assert.deepEqual(events.map((event) => [event.type, ...event.args.slice(0, 3)]), [
+      ['button', 1, 'cross', true], ['button', 1, 'cross', false],
+      ['key', 'k', true], ['key', 'k', false],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
 test('da Return to Main Menu il driver sale a Character Select con impulsi brevi e valida prima di Cross', async () => {
   const events = [];
   const { page, restore } = fakePage(async () => {
@@ -213,6 +267,13 @@ test('ripete Character Select se la prima conferma resta nei risultati', async (
     const confirmations = events.filter((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]).length;
     const movedToYes = events.some((event) => event.type === 'button' && event.args[1] === 'up' && !event.args[2]);
     if (confirmations < 2) return PNG.sync.write(resultsFrame(1));
+    if (confirmations >= 3) {
+      const png = new PNG({ width: 960, height: 540 });
+      paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      paint(png, 120, 35, 840, 105, [20, 70, 190]);
+      paint(png, 120, 440, 840, 520, [170, 25, 100]);
+      return PNG.sync.write(png);
+    }
     return PNG.sync.write(exitFrame(movedToYes ? 0 : 1));
   }, events);
   try {
@@ -238,6 +299,13 @@ test('dopo Character Select il driver sceglie Yes su EXIT prima del roster', asy
   const { page, restore } = fakePage(async () => {
     const confirmations = events.filter((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]).length;
     const movedToYes = events.some((event) => event.type === 'button' && event.args[1] === 'up' && !event.args[2]);
+    if (confirmations >= 2) {
+      const png = new PNG({ width: 960, height: 540 });
+      paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      paint(png, 120, 35, 840, 105, [20, 70, 190]);
+      paint(png, 120, 440, 840, 520, [170, 25, 100]);
+      return PNG.sync.write(png);
+    }
     return PNG.sync.write(confirmations === 0 ? resultsFrame(1) : exitFrame(movedToYes ? 0 : 1));
   }, events);
   page.waitForTimeout = async (ms) => { waits.push(ms); };

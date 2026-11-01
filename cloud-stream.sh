@@ -44,14 +44,25 @@ BT3_TARGET_URL="http://127.0.0.1:${PORT}/runtime.html?hud=0&embedded=0&lang=it&e
 node launcher.mjs &
 LAUNCHER_PID=$!
 
+# Una sola codifica: con la seconda destinazione (es. YouTube + X) tee duplica
+# l'output e onfail=ignore evita che la caduta di un provider fermi l'altro.
+if [[ -n "${STREAM_RTMP_URL_SECONDARY:-}" ]]; then
+  STREAM_OUTPUT="[f=flv:onfail=ignore]${STREAM_RTMP_URL}|[f=flv:onfail=ignore]${STREAM_RTMP_URL_SECONDARY}"
+  STREAM_FORMAT=( -flags +global_header -f tee )
+else
+  STREAM_OUTPUT="$STREAM_RTMP_URL"
+  STREAM_FORMAT=( -f flv )
+fi
+
 start_ffmpeg() {
   ffmpeg -hide_banner -loglevel warning \
     -f x11grab -framerate 60 -video_size 1920x1080 -i :99.0 \
     -f pulse -i default \
+    -map 0:v -map 1:a \
     -c:v libx264 -preset veryfast -tune zerolatency -pix_fmt yuv420p \
     -b:v 6000k -maxrate 6000k -bufsize 12000k -g 120 -keyint_min 120 -sc_threshold 0 \
     -c:a aac -b:a 160k -ar 44100 \
-    -f flv "$STREAM_RTMP_URL" &
+    "${STREAM_FORMAT[@]}" "$STREAM_OUTPUT" &
   FFMPEG_PID=$!
 }
 

@@ -29,6 +29,16 @@ test('lo streamer avvia display, server e launcher calibrato prima di FFmpeg', a
   assert.doesNotMatch(script, /echo .*STREAM_RTMP_URL|set -x/);
 });
 
+test('una seconda destinazione RTMP opzionale usa tee con una sola codifica', async () => {
+  const script = await read('cloud-stream.sh');
+  assert.match(script, /STREAM_RTMP_URL_SECONDARY:-/);
+  assert.match(script, /-f tee/);
+  assert.match(script, /onfail=ignore/);
+  assert.match(script, /"\$\{STREAM_FORMAT\[@\]\}" "\$STREAM_OUTPUT"/);
+  assert.doesNotMatch(script, /-f flv "\$STREAM_RTMP_URL"/);
+  assert.doesNotMatch(script, /echo .*(STREAM_OUTPUT|STREAM_RTMP_URL_SECONDARY)/);
+});
+
 test('il launcher attiva il client cloud solo quando richiesto dal container', async () => {
   const launcher = await read('launcher.mjs');
   assert.match(launcher, /BT3_CLOUD_SYNC === '1'/);

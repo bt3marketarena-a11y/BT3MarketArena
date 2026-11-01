@@ -303,19 +303,37 @@ export function readExitPromptSelection(png) {
 
 async function confirmExitPromptSelection(page, menuPlayer, target) {
   const { tap, padTap } = createMenuControls(page, () => {});
-  const selected = readExitPromptSelection(PNG.sync.read(await page.screenshot()));
+  const read = async () => readExitPromptSelection(PNG.sync.read(await page.screenshot()));
+  const label = target === 0 ? 'Yes' : 'No';
+  let selected = await read();
   if (selected === null) throw new Error('Pannello EXIT non leggibile: nessuna conferma inviata.');
-  const delta = selected - target;
-  for (let index = 0; index < Math.abs(delta); index += 1) {
-    if (menuPlayer === 0) await tap(delta > 0 ? 'ArrowUp' : 'ArrowDown', 120);
-    else await padTap(delta > 0 ? 'up' : 'down', 120);
-    await wait(page, 350);
+  // Come nel menu risultati, il proprietario di EXIT può non coincidere con il
+  // vincitore stimato dalle HP. L'altro pad riceve input soltanto mentre EXIT
+  // resta visibile con la voce richiesta verificata.
+  for (const player of [menuPlayer, menuPlayer === 0 ? 1 : 0]) {
+    for (let attempt = 0; selected !== target && attempt < 2; attempt += 1) {
+      const up = selected > target;
+      if (player === 0) await tap(up ? 'ArrowUp' : 'ArrowDown', 120);
+      else await padTap(up ? 'up' : 'down', 120);
+      await wait(page, 350);
+      selected = await read();
+      if (selected === null) throw new Error('Pannello EXIT scomparso durante lo spostamento; conferma bloccata.');
+    }
+    if (selected !== target) continue;
+    if (player === 0) await tap('k', 400);
+    else await padTap('cross', 400);
+    await wait(page, 1_000);
+    // Due frame consecutivi con EXIT ancora aperto: la conferma non è stata recepita.
+    let open = true;
+    for (let check = 0; check < 2 && open; check += 1) {
+      selected = await read();
+      if (selected === null) open = false;
+      else if (selected !== target) throw new Error(`Voce EXIT cambiata dopo la conferma ${label}; nessun altro input.`);
+      else if (check === 0) await wait(page, 250);
+    }
+    if (!open) return player;
   }
-  const verified = readExitPromptSelection(PNG.sync.read(await page.screenshot()));
-  if (verified !== target) throw new Error(`Voce EXIT ${target === 0 ? 'Yes' : 'No'} non verificata; conferma bloccata.`);
-  if (menuPlayer === 0) await tap('k', 400);
-  else await padTap('cross', 400);
-  await wait(page, 1_000);
+  throw new Error(`EXIT non chiuso su ${label} da nessun pad; conferma bloccata.`);
 }
 
 export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 500, menuPlayer = 1 } = {}) {
@@ -326,7 +344,7 @@ export async function waitForResultsMenu(page, { timeoutMs = 60_000, pollMs = 50
     if (hasConfirmedMapSelectionFrame(png)) return 'map';
     if (hasExitPromptFrame(png)) {
       console.log('[BT3 menu] EXIT? residuo: confermo No e torno al menu dei risultati');
-      await confirmExitPromptSelection(page, menuPlayer, 1);
+      menuPlayer = await confirmExitPromptSelection(page, menuPlayer, 1);
       continue;
     }
     const selected = readResultsMenuSelection(png);
