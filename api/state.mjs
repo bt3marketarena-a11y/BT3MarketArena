@@ -1,12 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { CloudStateStore } from '../cloudState.mjs';
-import { createRedisStateStore } from '../redisCloudState.mjs';
+import { createRedisStateStore, findRedisCredentials } from '../redisCloudState.mjs';
 
-const redisConfigured = Boolean(
-  (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
-  || (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-);
-const store = redisConfigured ? createRedisStateStore() : new CloudStateStore({ stateFile: null });
+const redisCredentials = findRedisCredentials();
+const store = redisCredentials ? createRedisStateStore(redisCredentials) : new CloudStateStore({ stateFile: null });
 const sseClients = new Set();
 const publicState = (state) => ({ ...state, storage: store.mode });
 

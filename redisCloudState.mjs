@@ -39,9 +39,25 @@ class RedisCloudStateStore {
   }
 }
 
+// Il Marketplace Vercel può aggiungere un prefisso scelto all'installazione
+// (es. STORAGE_KV_REST_API_URL): URL e token devono condividere lo stesso prefisso.
+export function findRedisCredentials(env = process.env) {
+  for (const [urlSuffix, tokenSuffix] of [['KV_REST_API_URL', 'KV_REST_API_TOKEN'], ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']]) {
+    const prefixes = Object.keys(env)
+      .filter((key) => key.endsWith(urlSuffix) && env[key])
+      .map((key) => key.slice(0, -urlSuffix.length))
+      .sort((a, b) => a.length - b.length);
+    for (const prefix of prefixes) {
+      const token = env[`${prefix}${tokenSuffix}`];
+      if (token) return { url: env[`${prefix}${urlSuffix}`], token };
+    }
+  }
+  return null;
+}
+
 export function createRedisStateStore({
-  url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL,
-  token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN,
+  url = findRedisCredentials()?.url,
+  token = findRedisCredentials()?.token,
   fetchImpl = globalThis.fetch,
   client = null,
   now = () => new Date().toISOString(),
