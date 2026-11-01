@@ -237,7 +237,8 @@ function brightRowTextCount(png, center) {
       const red = png.data[offset];
       const green = png.data[offset + 1];
       const blue = png.data[offset + 2];
-      const neutral = Math.min(red, green, blue) > 150 && Math.max(red, green, blue) - Math.min(red, green, blue) < 65;
+      // Il testo non selezionato del menu reale è grigio-azzurro, non bianco puro.
+      const neutral = Math.min(red, green, blue) > 90 && Math.max(red, green, blue) - Math.min(red, green, blue) < 105;
       const yellow = red > 140 && green > 100 && blue < 120 && red > blue * 1.6 && green > blue * 1.3;
       if (neutral || yellow) count += 1;
     }

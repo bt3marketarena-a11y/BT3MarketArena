@@ -78,6 +78,14 @@ test('il menu risultati largo è distinto dal pannello EXIT stretto', () => {
   assert.equal(hasResultsMenuFrame(exitFrame()), false);
 });
 
+test('il menu finale riconosce il testo grigio-azzurro del rendering compatto', () => {
+  const png = resultsFrame();
+  for (const center of [252, 284, 311, 342, 371]) {
+    paint(png, 310, center - 5, 650, center + 5, [110, 125, 140]);
+  }
+  assert.equal(hasResultsMenuFrame(png), true);
+});
+
 test('il menu pausa a quattro voci non viene scambiato per il menu finale', () => {
   const png = new PNG({ width: 960, height: 540 });
   paint(png, 0, 0, 960, 540, [35, 130, 55]);
