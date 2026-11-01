@@ -43,6 +43,23 @@ function menuFrame(withMenu, selected = 0) {
   return png;
 }
 
+function characterFrame() {
+  const png = menuFrame(false);
+  const fill = (x0, y0, x1, y1, color) => {
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const offset = (y * png.width + x) * 4;
+        png.data[offset] = color[0];
+        png.data[offset + 1] = color[1];
+        png.data[offset + 2] = color[2];
+      }
+    }
+  };
+  fill(120, 35, 840, 105, [20, 70, 190]);
+  fill(120, 440, 840, 520, [170, 25, 100]);
+  return png;
+}
+
 test('il post-match attende tre frame finché compare il menu dei risultati', async () => {
   const frames = [menuFrame(false), menuFrame(false), menuFrame(true)];
   let captures = 0;
@@ -78,7 +95,7 @@ test('dopo il menu visibile P2 preme giù e Cross, senza tastiera né Rematch an
       const confirmed = buttons.some(([player, button, pressed]) =>
         player === 1 && button === 'cross' && !pressed
       );
-      if (frameIndex >= 2 && confirmed) return PNG.sync.write(menuFrame(false));
+      if (frameIndex >= 2 && confirmed) return PNG.sync.write(characterFrame());
       return PNG.sync.write(frameIndex < 2 ? frames[frameIndex] : menuFrame(true, moved ? 1 : 0));
     },
     waitForTimeout: async () => {},

@@ -159,6 +159,8 @@ test('da Return to Main Menu il driver sale a Character Select con impulsi brevi
     if (confirmed) {
       const png = new PNG({ width: 960, height: 540 });
       paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      paint(png, 120, 35, 840, 105, [20, 70, 190]);
+      paint(png, 120, 440, 840, 520, [170, 25, 100]);
       return PNG.sync.write(png);
     }
     return PNG.sync.write(resultsFrame(ups >= 2 ? 1 : 3));
@@ -198,6 +200,31 @@ test('il pannello EXIT distingue Yes da No', () => {
   assert.equal(readExitPromptSelection(resultsFrame(1)), null);
 });
 
+test('ripete Character Select se la prima conferma resta nei risultati', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const confirmations = events.filter((event) => event.type === 'button' && event.args[1] === 'cross' && !event.args[2]).length;
+    const movedToYes = events.some((event) => event.type === 'button' && event.args[1] === 'up' && !event.args[2]);
+    if (confirmations < 2) return PNG.sync.write(resultsFrame(1));
+    return PNG.sync.write(exitFrame(movedToYes ? 0 : 1));
+  }, events);
+  try {
+    await runRematchSequence(page, {
+      menuPlayer: 1,
+      rosterSequence: async () => ({ verified: true }),
+    });
+    const buttons = events.filter((event) => event.type === 'button').map((event) => event.args);
+    assert.deepEqual(buttons, [
+      [1, 'cross', true], [1, 'cross', false],
+      [1, 'cross', true], [1, 'cross', false],
+      [1, 'up', true], [1, 'up', false],
+      [1, 'cross', true], [1, 'cross', false],
+    ]);
+  } finally {
+    restore();
+  }
+});
+
 test('dopo Character Select il driver sceglie Yes su EXIT prima del roster', async () => {
   const events = [];
   const waits = [];
@@ -232,6 +259,8 @@ test('se P1 non muove il menu il driver prova P2 e conferma solo dopo il movimen
     if (confirmed) {
       const png = new PNG({ width: 960, height: 540 });
       paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      paint(png, 120, 35, 840, 105, [20, 70, 190]);
+      paint(png, 120, 440, 840, 520, [170, 25, 100]);
       return PNG.sync.write(png);
     }
     return PNG.sync.write(resultsFrame(moved ? 1 : 0));
