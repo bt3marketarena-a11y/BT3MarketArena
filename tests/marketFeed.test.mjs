@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RollingPressure, classifyTrade, normalizePumpTrade } from '../marketFeed.js';
+import { MarketFeed, RollingPressure, classifyTrade, normalizePumpTrade } from '../marketFeed.js';
 
 test('RollingPressure calcola dominance e scarta eventi scaduti', () => {
   const now = 100_000;
@@ -69,4 +69,15 @@ test('un cambio CA rapido ignora la risposta lenta del feed precedente', async (
   assert.equal(feed.latestPrice, 2);
   assert.deepEqual(markets, [2]);
   feed.stop();
+});
+
+test('MarketFeed invoca fetch con globalThis come richiesto dal browser', async () => {
+  const feed = new MarketFeed({
+    fetchImpl: function (url) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve({ ok: true, json: async () => ({ pairs: [{ chainId: 'solana', url }] }) });
+    },
+  });
+  const pair = await feed.fetchDexPair('So11111111111111111111111111111111111111112');
+  assert.equal(pair.chainId, 'solana');
 });

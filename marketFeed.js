@@ -73,7 +73,8 @@ export class MarketFeed {
     this.onMarket = onMarket;
     this.pressure = new RollingPressure(pressureWindowMs);
     this.whaleThresholdUsd = whaleThresholdUsd;
-    this.fetch = fetchImpl;
+    // fetch nativo richiede window come this: invocato come metodo lancia "Illegal invocation".
+    this.fetch = (...args) => fetchImpl.apply(globalThis, args);
     this.WebSocket = WebSocketImpl;
     this.random = random;
     this.mode = 'idle';

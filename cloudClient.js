@@ -7,10 +7,12 @@ export class CloudConfigClient {
     clearIntervalImpl = globalThis.clearInterval,
   } = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.fetch = fetchImpl;
+    // Nel browser fetch/setInterval/clearInterval richiedono window come this:
+    // invocati come metodi del client lanciano "Illegal invocation".
+    this.fetch = (...args) => fetchImpl.apply(globalThis, args);
     this.EventSource = EventSourceImpl;
-    this.setInterval = setIntervalImpl;
-    this.clearInterval = clearIntervalImpl;
+    this.setInterval = (...args) => setIntervalImpl.apply(globalThis, args);
+    this.clearInterval = (...args) => clearIntervalImpl.apply(globalThis, args);
   }
 
   async request(url, options = {}) {

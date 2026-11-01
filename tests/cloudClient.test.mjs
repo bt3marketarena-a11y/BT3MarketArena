@@ -53,3 +53,23 @@ test('il polling recupera una revisione pubblicata da un’altra istanza', async
   assert.equal(states[0].revision, 4);
   assert.equal(cleared, true);
 });
+
+test('fetch e timer globali vengono invocati con globalThis come nel browser', async () => {
+  // Il browser lancia "Illegal invocation" se queste funzioni ricevono il client come this.
+  const strict = (name, result) => function (...args) {
+    if (this !== globalThis) throw new TypeError(`Illegal invocation: ${name}`);
+    return result(...args);
+  };
+  let tick;
+  const client = new CloudConfigClient({
+    fetchImpl: strict('fetch', async () => ({ ok: true, json: async () => PUBLIC_STATE })),
+    EventSourceImpl: null,
+    setIntervalImpl: strict('setInterval', (fn) => { tick = fn; return 7; }),
+    clearIntervalImpl: strict('clearInterval', () => {}),
+  });
+  const states = [];
+  const close = client.subscribe((state) => states.push(state), (error) => { throw error; });
+  await tick();
+  close();
+  assert.equal(states[0].revision, 3);
+});
