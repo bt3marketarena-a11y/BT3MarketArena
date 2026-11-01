@@ -271,11 +271,11 @@ export function hasExitPromptFrame(png) {
   return !hasResultsMenuFrame(png) && darkRatio > 0.2 && brightText > 24 && center > 0.4 && yesNoSelection;
 }
 
-function yellowTextCount(png, center) {
+function yellowTextCount(png, center, minX = 0.2, maxX = 0.8) {
   const scaledCenter = center * png.height / 540;
   let yellow = 0;
   for (let y = Math.floor(scaledCenter - 9 * png.height / 540); y <= Math.ceil(scaledCenter + 9 * png.height / 540); y += 2) {
-    for (let x = Math.floor(png.width * 0.2); x < Math.ceil(png.width * 0.8); x += 3) {
+    for (let x = Math.floor(png.width * minX); x < Math.ceil(png.width * maxX); x += 3) {
       const offset = (y * png.width + x) * 4;
       const red = png.data[offset];
       const green = png.data[offset + 1];
@@ -295,7 +295,8 @@ export function readResultsMenuSelection(png) {
 
 export function readExitPromptSelection(png) {
   if (!hasExitPromptFrame(png)) return null;
-  const counts = [280, 311].map((center) => yellowTextCount(png, center));
+  // Yes/No sono centrati: le armature gialle ai lati non devono cambiare il vincitore.
+  const counts = [280, 311].map((center) => yellowTextCount(png, center, 0.44, 0.56));
   const selected = counts.indexOf(Math.max(...counts));
   return counts[selected] > 20 ? selected : null;
 }

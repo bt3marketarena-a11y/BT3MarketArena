@@ -200,6 +200,13 @@ test('il pannello EXIT distingue Yes da No', () => {
   assert.equal(readExitPromptSelection(resultsFrame(1)), null);
 });
 
+test('i colori del personaggio ai lati non cambiano la selezione EXIT da No a Yes', () => {
+  const png = exitFrame(1);
+  paint(png, 210, 270, 420, 282, [230, 220, 40]);
+  paint(png, 540, 270, 750, 282, [230, 220, 40]);
+  assert.equal(readExitPromptSelection(png), 1);
+});
+
 test('ripete Character Select se la prima conferma resta nei risultati', async () => {
   const events = [];
   const { page, restore } = fakePage(async () => {
