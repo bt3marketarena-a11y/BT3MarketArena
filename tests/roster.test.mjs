@@ -196,6 +196,7 @@ test('il percorso roster attende ogni stato visivo e non usa le lunghe attese fi
   const waits = [];
   const previousWindow = globalThis.window;
   globalThis.window = {
+    __BT3_MARKET_ARENA__: { automationError: 'errore EXIT già superato' },
     marketArena: {
       bridge: {
         keyboardEvents: true,
@@ -244,6 +245,7 @@ test('il percorso roster attende ogni stato visivo e non usa le lunghe attese fi
   };
   try {
     await runRosterSequence(page, { random: () => 0 });
+    assert.equal(globalThis.window.__BT3_MARKET_ARENA__.automationError, null);
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;

@@ -102,6 +102,31 @@ test('un pattern a sei voci con il timer ancora visibile non dichiara il KO', ()
   assert.equal(hasResultsMenuFrame(png), false);
 });
 
+test('con Character Select già visibile il recovery riprende dal roster senza cercare i risultati', async () => {
+  const events = [];
+  let captures = 0;
+  let rosterCalls = 0;
+  const { page, restore } = fakePage(async () => {
+    captures += 1;
+    if (captures > 3) throw new Error('il driver sta ancora cercando il menu risultati');
+    const png = new PNG({ width: 960, height: 540 });
+    paint(png, 0, 0, 960, 540, [55, 130, 65]);
+    paint(png, 120, 35, 840, 105, [20, 70, 190]);
+    paint(png, 120, 440, 840, 520, [170, 25, 100]);
+    return PNG.sync.write(png);
+  }, events);
+  try {
+    const result = await runRematchSequence(page, {
+      rosterSequence: async () => { rosterCalls += 1; return { recovered: true }; },
+    });
+    assert.deepEqual(result, { recovered: true });
+    assert.equal(rosterCalls, 1);
+    assert.equal(events.length, 0);
+  } finally {
+    restore();
+  }
+});
+
 test('la selezione Character Select viene letta senza assumere Fight Again', () => {
   for (const selected of [0, 1, 3, 5]) {
     assert.equal(readResultsMenuSelection(resultsFrame(selected)), selected);

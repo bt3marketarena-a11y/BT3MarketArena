@@ -548,6 +548,7 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
     else match.start();
     window.marketArena.bridge.setMode(0, 'neutral');
     window.marketArena.bridge.setMode(1, 'neutral');
+    if (window.__BT3_MARKET_ARENA__) window.__BT3_MARKET_ARENA__.automationError = null;
   });
   progress('combattimento 3D avviato; controllare la cattura video');
   return plan;
@@ -563,6 +564,11 @@ export async function runRematchSequence(page, options = {}) {
     window.marketArena.bridge.setMode(1, 'idle');
     document.querySelector('canvas')?.focus();
   });
+  const recoveryFrame = PNG.sync.read(await page.screenshot());
+  if (hasCharacterSelectionFrame(recoveryFrame)) {
+    progress('Character Select già visibile: ripresa diretta del roster, senza cercare i risultati');
+    return rosterSequence(page, options);
+  }
   progress('attesa visiva del menu dei risultati; nessuna conferma anticipata');
   let selected = await waitForResultsMenu(page, { menuPlayer });
   progress(`post-match P${menuPlayer + 1}: dalla voce ${selected + 1} a Character Select`);
