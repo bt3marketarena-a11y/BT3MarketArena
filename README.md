@@ -134,6 +134,18 @@ docker run -d --name bt3-market-arena --restart unless-stopped \
 
 Su Render/Railway scegli il deploy **Dockerfile**, espone la porta HTTP e configura lo stesso volume persistente. Il servizio deve avere CPU/RAM sufficienti per Chromium WebGL2 e codifica 1080p60. Account cloud, quota e chiavi RTMP non sono inclusi nel progetto.
 
+### Streamer 24/7 nativo su Windows (senza Docker)
+
+`scripts/stream-win.mjs` replica `cloud-stream.sh` su Windows. Avvia `scripts/arenaServer.mjs` con `CLOUD_STATE_ORIGIN` (predefinito `https://bt-3-market-arena.vercel.app`) e il launcher kiosk con `inject=0`, poi FFmpeg nativo. FFmpeg cattura il desktop con `gdigrab` a 60 fps, scala a 1920×1080 e codifica H.264 6000 kbit/s (GOP 120) + AAC 160 kbit/s. Con `STREAM_RTMP_URL_SECONDARY` usa `tee` con `onfail=ignore`. Se FFmpeg cade riprova dopo 5 s; se il launcher esce (per esempio per un errore dei menu) lo riapre dopo 10 s senza fermare lo stream. FFmpeg si installa con `winget install --id Gyan.FFmpeg -e`; lo script lo trova da solo oppure tramite `FFMPEG_PATH`.
+
+```powershell
+$env:STREAM_RTMP_URL = Read-Host -MaskInput "YouTube RTMP URL + key"
+$env:STREAM_RTMP_URL_SECONDARY = Read-Host -MaskInput "X RTMPS URL + key"
+node scripts/stream-win.mjs
+```
+
+Il kiosk deve restare in primo piano sul monitor principale, senza altre finestre sopra (nemmeno terminali o chat): il launcher legge i pixel reali dello schermo e FFmpeg cattura soltanto il monitor principale, rilevato in pixel fisici. Con più monitor `gdigrab desktop` coprirebbe tutti gli schermi e manderebbe in onda anche finestre private. Per forzare un'area usa `STREAM_CAPTURE_REGION=x,y,LARGHEZZAxALTEZZA`; `STREAM_CAPTURE=title=<titolo finestra>` cattura invece una sola finestra. Windows non espone l'audio di sistema a FFmpeg senza un dispositivo di loopback: imposta `STREAM_AUDIO_DEVICE` con il nome DirectShow di "Stereo Mix" o di un cavo virtuale (elenco: `ffmpeg -list_devices true -f dshow -i dummy`). Senza, la traccia audio è muta; il microfono non viene mai usato per default. Per una prova locale usa percorsi di file come destinazioni e `STREAM_DURATION_SEC`.
+
 ## Variabili d'ambiente
 
 | Variabile | Obbligatoria | Descrizione |

@@ -82,3 +82,7 @@ canvas{position:fixed!important;inset:0!important;width:100vw!important;height:1
 }
 
 @media(prefers-reduced-motion:reduce){.feed-chevron{transition:none}}
+
+/* lab-speed.js del sito originale si attiva con qualsiasi parametro hud (anche hud=0) e scrive
+   "FPS de presentación" in #hud e "Preparando recursos del combate…" in #lab-speed: fuori dalla live. */
+#lab-speed,#hud{display:none!important}

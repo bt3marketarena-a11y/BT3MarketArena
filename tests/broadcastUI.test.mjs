@@ -47,3 +47,10 @@ test('il layout mobile usa font leggibili, safe area e target touch', async () =
   assert.match(css, /@media\s*\(max-width:\s*600px\)/);
   assert.match(css, /\.admin-open\{[^}]*min-width:44px[^}]*min-height:44px/);
 });
+
+test('la diagnostica spagnola del runtime originale resta fuori dalla live', async () => {
+  const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(css, /#lab-speed,#hud\{display:none!important\}/);
+  assert.doesNotMatch(html, /id="(hud|lab-speed)"/, 'gli id nascosti appartengono soltanto al runtime originale');
+});
