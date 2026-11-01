@@ -98,6 +98,9 @@ jobs:
             done
             if [ -f artifacts/volume-summary.txt ]; then echo '### Audio'; sed 's/^/    /' artifacts/volume-summary.txt; fi
           } >> "$GITHUB_STEP_SUMMARY" || true
+          # Le annotazioni sono leggibili anche dall'API pubblica, a differenza di log e summary.
+          tail_text=$(tail -n 30 artifacts/cloud-stream.log 2>/dev/null | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::notice title=cloud-stream.sh tail::${tail_text}"
 
       - uses: actions/upload-artifact@v4
         if: always()
