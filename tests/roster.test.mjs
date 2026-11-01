@@ -56,6 +56,15 @@ test('il roster base è distinto dai pannelli Custom Select e Select Color', () 
   assert.equal(hasSelectColorFrame(png, 1), false);
 });
 
+test('il roster resta valido quando il viewport compatto espone solo 16 campioni magenta', () => {
+  const png = rosterFrame();
+  paint(png, 120, 440, 840, 520, [55, 130, 65]);
+  for (let index = 0; index < 16; index += 1) {
+    paint(png, 115 + index * 6, 442, 121 + index * 6, 446, [170, 25, 100]);
+  }
+  assert.equal(hasCharacterSelectionFrame(png), true);
+});
+
 test('Custom Select viene riconosciuto sul lato del rispettivo giocatore', () => {
   const png = rosterFrame();
   addCustomSelect(png, 0);

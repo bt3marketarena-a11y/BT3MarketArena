@@ -201,7 +201,8 @@ export function hasCharacterSelectionFrame(png) {
       if (red > 100 && blueChannel > 60 && red > green * 1.5 && blueChannel > green * 1.3) magenta += 1;
     }
   }
-  return blue > 30 && magenta > 30 && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
+  // Nei viewport compatti la seconda riga del roster può produrre solo 16 campioni.
+  return blue > 30 && magenta > 10 && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
 }
 
 export function hasMapSelectionFrame(png) {
