@@ -123,6 +123,13 @@ test('Map Select è colorato e non contiene più roster o pannelli colore', () =
   assert.equal(hasMapSelectionFrame(rosterFrame()), false);
 });
 
+test('Map Select non viene confuso col roster compatto anche con blu e magenta', () => {
+  const png = rosterFrame();
+  paint(png, 200, 30, 600, 95, [200, 90, 30]);
+  assert.equal(hasCharacterSelectionFrame(png), false);
+  assert.equal(hasMapSelectionFrame(png), true);
+});
+
 test('P2 senza Select Color è già pronto dopo Normal e non riceve altre conferme', async () => {
   const events = [];
   const states = [];

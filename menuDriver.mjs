@@ -180,6 +180,21 @@ export function hasSelectColorFrame(png, player) {
     && !rosterPanelRow(png, player, 309);
 }
 
+function hasMapHeaderFrame(png) {
+  let title = 0;
+  // Il titolo arancione Map Select distingue cielo e riquadri della mappa dal roster.
+  for (let y = Math.floor(png.height * 0.055); y < Math.ceil(png.height * 0.18); y += 2) {
+    for (let x = Math.floor(png.width * 0.12); x < Math.ceil(png.width * 0.66); x += 2) {
+      const offset = (y * png.width + x) * 4;
+      const red = png.data[offset];
+      const green = png.data[offset + 1];
+      const blue = png.data[offset + 2];
+      if (red > 155 && green > 35 && green < 190 && blue < 105 && red > green * 1.08 && red > blue * 1.65) title += 1;
+    }
+  }
+  return title > 800;
+}
+
 export function hasCharacterSelectionFrame(png) {
   let blue = 0;
   let magenta = 0;
@@ -202,7 +217,8 @@ export function hasCharacterSelectionFrame(png) {
     }
   }
   // Nei viewport compatti la seconda riga del roster può produrre solo 16 campioni.
-  return blue > 30 && magenta > 10 && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
+  return blue > 30 && magenta > 10 && !hasMapHeaderFrame(png)
+    && ![0, 1].some((player) => hasCustomSelectFrame(png, player) || hasSelectColorFrame(png, player));
 }
 
 export function hasMapSelectionFrame(png) {
