@@ -42,3 +42,31 @@ test('normalizePumpTrade converte lamports e direzione in evento comune', () => 
   assert.equal(event.id, 'abc');
   assert.equal(event.source, 'pumpportal');
 });
+
+test('un cambio CA rapido ignora la risposta lenta del feed precedente', async (t) => {
+  const { MarketFeed } = await import('../marketFeed.js');
+  const firstCa = 'So11111111111111111111111111111111111111112';
+  const secondCa = '11111111111111111111111111111112';
+  let releaseFirst;
+  const pair = (price) => ({ pairs: [{ chainId: 'solana', priceUsd: String(price), marketCap: price * 100, txns: { m5: { buys: 0, sells: 0 } } }] });
+  const markets = [];
+  const feed = new MarketFeed({
+    fetchImpl: async (url) => {
+      if (url.includes(firstCa)) {
+        return new Promise((resolve) => { releaseFirst = () => resolve(new Response(JSON.stringify(pair(1)), { status: 200 })); });
+      }
+      return new Response(JSON.stringify(pair(2)), { status: 200 });
+    },
+    onMarket: (market) => markets.push(market.price),
+  });
+  t.after(() => feed.stop());
+  const first = feed.connect('dexscreener', firstCa, { pollMs: 60_000 });
+  await Promise.resolve();
+  await feed.connect('dexscreener', secondCa, { pollMs: 60_000 });
+  releaseFirst();
+  await first;
+  assert.equal(feed.contractAddress, secondCa);
+  assert.equal(feed.latestPrice, 2);
+  assert.deepEqual(markets, [2]);
+  feed.stop();
+});

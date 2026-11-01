@@ -31,7 +31,7 @@ export function validatePublicState(state) {
   return state;
 }
 
-function normalizePatch(current, patch) {
+export function normalizePublicStatePatch(current, patch) {
   const unknown = Object.keys(patch).filter((key) => !ALLOWED_FIELDS.has(key));
   if (unknown.length) throw new Error(`Campi non consentiti: ${unknown.join(', ')}`);
   const merged = { ...current, ...patch };
@@ -52,6 +52,7 @@ function normalizePatch(current, patch) {
 export class CloudStateStore {
   constructor({ stateFile = null } = {}) {
     this.stateFile = stateFile;
+    this.mode = stateFile ? 'file' : 'memory';
     this.state = { ...DEFAULT_PUBLIC_STATE, revision: 0, updatedAt: null };
     this.queue = Promise.resolve();
     this.ready = this.load();
@@ -62,7 +63,7 @@ export class CloudStateStore {
     try {
       const saved = JSON.parse(await readFile(this.stateFile, 'utf8'));
       const { revision = 0, updatedAt = null, ...config } = saved;
-      this.state = { ...normalizePatch(DEFAULT_PUBLIC_STATE, config), revision, updatedAt };
+      this.state = { ...normalizePublicStatePatch(DEFAULT_PUBLIC_STATE, config), revision, updatedAt };
     } catch (error) {
       if (error.code !== 'ENOENT') throw new Error(`Stato cloud non leggibile: ${error.message}`);
     }
@@ -76,7 +77,7 @@ export class CloudStateStore {
   update(patch) {
     this.queue = this.queue.catch(() => {}).then(async () => {
       await this.ready;
-      const publicConfig = normalizePatch(this.state, patch);
+      const publicConfig = normalizePublicStatePatch(this.state, patch);
       const next = { ...publicConfig, revision: this.state.revision + 1, updatedAt: new Date().toISOString() };
       if (this.stateFile) {
         await mkdir(path.dirname(this.stateFile), { recursive: true });

@@ -3,10 +3,14 @@ export class CloudConfigClient {
     baseUrl = '',
     fetchImpl = globalThis.fetch,
     EventSourceImpl = globalThis.EventSource,
+    setIntervalImpl = globalThis.setInterval,
+    clearIntervalImpl = globalThis.clearInterval,
   } = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.fetch = fetchImpl;
     this.EventSource = EventSourceImpl;
+    this.setInterval = setIntervalImpl;
+    this.clearInterval = clearIntervalImpl;
   }
 
   async request(url, options = {}) {
@@ -28,13 +32,34 @@ export class CloudConfigClient {
     });
   }
 
-  subscribe(onState, onError = () => {}) {
-    if (!this.EventSource) throw new Error('EventSource non disponibile nel browser.');
-    const events = new this.EventSource(`${this.baseUrl}/api/events`);
-    events.addEventListener('state', (event) => {
-      try { onState(JSON.parse(event.data)); } catch (error) { onError(error); }
-    });
-    events.addEventListener('error', () => onError(new Error('SSE disconnesso: riconnessione automatica.')));
-    return () => events.close();
+  subscribe(onState, onError = () => {}, { pollMs = 2_000 } = {}) {
+    let closed = false;
+    let polling = false;
+    let events = null;
+    if (this.EventSource) {
+      try {
+        events = new this.EventSource(`${this.baseUrl}/api/events`);
+        events.addEventListener('state', (event) => {
+          try { onState(JSON.parse(event.data)); } catch (error) { onError(error); }
+        });
+        events.addEventListener('error', () => onError(new Error('SSE disconnesso: il polling mantiene lo stato sincronizzato.')));
+      } catch (error) {
+        onError(error);
+      }
+    }
+    const poll = async () => {
+      if (closed || polling) return;
+      polling = true;
+      try { onState(await this.load()); }
+      catch (error) { if (!closed) onError(error); }
+      finally { polling = false; }
+    };
+    const timer = this.setInterval(() => poll(), Math.max(500, pollMs));
+    timer?.unref?.();
+    return () => {
+      closed = true;
+      this.clearInterval(timer);
+      events?.close();
+    };
   }
 }

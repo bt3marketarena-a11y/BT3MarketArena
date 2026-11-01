@@ -1,8 +1,14 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { CloudStateStore } from '../cloudState.mjs';
+import { createRedisStateStore } from '../redisCloudState.mjs';
 
-const store = new CloudStateStore({ stateFile: null });
+const redisConfigured = Boolean(
+  (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+  || (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+);
+const store = redisConfigured ? createRedisStateStore() : new CloudStateStore({ stateFile: null });
 const sseClients = new Set();
+const publicState = (state) => ({ ...state, storage: store.mode });
 
 function sendJson(response, status, payload) {
   const body = JSON.stringify(payload);
@@ -34,7 +40,7 @@ async function readJson(request) {
 }
 
 function writeSse(response, state) {
-  response.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`);
+  response.write(`event: state\ndata: ${JSON.stringify(publicState(state))}\n\n`);
 }
 
 export default async function handler(request, response) {
@@ -54,7 +60,7 @@ export default async function handler(request, response) {
       return;
     }
     if (request.method === 'GET') {
-      sendJson(response, 200, await store.get());
+      sendJson(response, 200, publicState(await store.get()));
       return;
     }
     if (request.method === 'PATCH' || request.method === 'PUT') {
@@ -62,7 +68,7 @@ export default async function handler(request, response) {
       if (!authorized(request)) { sendJson(response, 401, { error: 'ADMIN_KEY non valida o assente.' }); return; }
       const state = await store.update(await readJson(request));
       for (const client of sseClients) writeSse(client, state);
-      sendJson(response, 200, state);
+      sendJson(response, 200, publicState(state));
       return;
     }
     sendJson(response, 405, { error: 'Metodo non consentito.' });

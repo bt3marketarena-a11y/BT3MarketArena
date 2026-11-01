@@ -29,10 +29,27 @@ test('il client decodifica gli eventi state SSE e restituisce la chiusura', () =
     close() { closed = true; }
   }
   const states = [];
-  const client = new CloudConfigClient({ EventSourceImpl: FakeEventSource });
+  const client = new CloudConfigClient({ EventSourceImpl: FakeEventSource, setIntervalImpl: () => 1, clearIntervalImpl: () => {} });
   const close = client.subscribe((state) => states.push(state));
   listeners.get('state')({ data: JSON.stringify(PUBLIC_STATE) });
   assert.deepEqual(states, [PUBLIC_STATE]);
   close();
   assert.equal(closed, true);
+});
+
+test('il polling recupera una revisione pubblicata da un’altra istanza', async () => {
+  let tick;
+  let cleared = false;
+  const client = new CloudConfigClient({
+    fetchImpl: async () => ({ ok: true, json: async () => ({ ...PUBLIC_STATE, revision: 4 }) }),
+    EventSourceImpl: null,
+    setIntervalImpl: (fn) => { tick = fn; return 1; },
+    clearIntervalImpl: () => { cleared = true; },
+  });
+  const states = [];
+  const close = client.subscribe((state) => states.push(state));
+  await tick();
+  close();
+  assert.equal(states[0].revision, 4);
+  assert.equal(cleared, true);
 });

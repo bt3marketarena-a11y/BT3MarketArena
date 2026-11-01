@@ -88,6 +88,11 @@ export class MarketFeed {
     this.reconnectAttempt = 0;
     this.reconnectConfig = null;
     this.previousDexCounts = null;
+    this.connectionGeneration = 0;
+  }
+
+  isCurrentConnection(generation) {
+    return this.running && generation === this.connectionGeneration;
   }
 
   status(state, detail = '') {
@@ -150,6 +155,7 @@ export class MarketFeed {
     const ca = String(contractAddress ?? '').trim();
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ca)) throw new Error('Inserisci una mint Solana valida (32–44 caratteri Base58).');
     this.stop();
+    const generation = this.connectionGeneration;
     this.running = true;
     this.mode = source;
     this.contractAddress = ca;
@@ -157,32 +163,34 @@ export class MarketFeed {
     this.pressure.clear();
     this.reconnectConfig = { source, ca, options };
     this.status('connecting', `Connessione a ${source}`);
-    if (source === 'pumpportal') return this.connectPumpPortal(ca, options);
-    if (source === 'dexscreener') return this.connectDexScreener(ca, options);
-    if (source === 'solana') return this.connectSolana(ca, options);
+    if (source === 'pumpportal') return this.connectPumpPortal(ca, options, generation);
+    if (source === 'dexscreener') return this.connectDexScreener(ca, options, generation);
+    if (source === 'solana') return this.connectSolana(ca, options, generation);
     throw new Error(`Sorgente non supportata: ${source}`);
   }
 
-  async connectPumpPortal(ca, { solUsdPrice = null } = {}) {
+  async connectPumpPortal(ca, { solUsdPrice = null } = {}, generation = this.connectionGeneration) {
     const rate = solUsdPrice ?? await this.fetchSolUsdPrice();
+    if (!this.isCurrentConnection(generation)) return;
     const url = 'wss://pumpportal.fun/api/data';
     this.openSocket(url, {
       onOpen: (socket) => socket.send(JSON.stringify({ method: 'subscribeTokenTrade', keys: [ca] })),
       onMessage: (data) => {
-        if (!data.txType || !data.sol_amount) return;
+        if (!this.isCurrentConnection(generation) || !data.txType || !data.sol_amount) return;
         const event = normalizePumpTrade(data, rate);
         if (event.marketCap && this.supply) event.price = event.marketCap / this.supply;
         this.emitTrade(event);
         this.emitMarket();
       },
-    });
+    }, generation);
   }
 
-  async connectDexScreener(ca, { pollMs = 5_000 } = {}) {
+  async connectDexScreener(ca, { pollMs = 5_000 } = {}, generation = this.connectionGeneration) {
     const poll = async () => {
-      if (!this.running || this.mode !== 'dexscreener') return;
+      if (!this.isCurrentConnection(generation) || this.mode !== 'dexscreener') return;
       try {
         const pair = await this.fetchDexPair(ca);
+        if (!this.isCurrentConnection(generation)) return;
         const counts = { buys: safeNumber(pair.txns?.m5?.buys), sells: safeNumber(pair.txns?.m5?.sells) };
         this.latestPrice = safeNumber(pair.priceUsd, this.latestPrice);
         this.latestMarketCap = safeNumber(pair.marketCap ?? pair.fdv, this.latestMarketCap);
@@ -213,25 +221,27 @@ export class MarketFeed {
         this.status('live', 'Polling DexScreener: eventi aggregati su 5 minuti');
         this.emitMarket();
       } catch (error) {
-        if (error.name !== 'AbortError') this.status('degraded', error.message);
+        if (this.isCurrentConnection(generation) && error.name !== 'AbortError') this.status('degraded', error.message);
       }
     };
     await poll();
-    this.timer = setInterval(poll, Math.max(2_000, pollMs));
+    if (this.isCurrentConnection(generation)) this.timer = setInterval(poll, Math.max(2_000, pollMs));
   }
 
   async connectSolana(ca, {
     wsUrl = 'wss://api.mainnet-beta.solana.com',
     httpUrl = 'https://api.mainnet-beta.solana.com',
-  } = {}) {
+  } = {}, generation = this.connectionGeneration) {
     try {
       const pair = await this.fetchDexPair(ca);
+      if (!this.isCurrentConnection(generation)) return;
       this.latestPrice = safeNumber(pair.priceUsd, null);
       this.latestMarketCap = safeNumber(pair.marketCap ?? pair.fdv, null);
       this.emitMarket();
     } catch {
-      this.status('degraded', 'Prezzo iniziale non disponibile; il feed RPC continua.');
+      if (this.isCurrentConnection(generation)) this.status('degraded', 'Prezzo iniziale non disponibile; il feed RPC continua.');
     }
+    if (!this.isCurrentConnection(generation)) return;
     let requestId = 1;
     this.openSocket(wsUrl, {
       onOpen: (socket) => socket.send(JSON.stringify({
@@ -239,20 +249,22 @@ export class MarketFeed {
         params: [{ mentions: [ca] }, { commitment: 'confirmed' }],
       })),
       onMessage: async (data) => {
+        if (!this.isCurrentConnection(generation)) return;
         const signature = data.params?.result?.value?.signature;
         if (!signature || data.params?.result?.value?.err) return;
         try {
           const transaction = await this.fetchSolanaTransaction(httpUrl, signature);
+          if (!this.isCurrentConnection(generation)) return;
           const event = this.normalizeSolanaTransaction(transaction, ca, signature);
           if (event) {
             this.emitTrade(event);
             this.emitMarket();
           }
         } catch (error) {
-          this.status('degraded', `Transazione ${signature.slice(0, 8)}: ${error.message}`);
+          if (this.isCurrentConnection(generation)) this.status('degraded', `Transazione ${signature.slice(0, 8)}: ${error.message}`);
         }
       },
-    });
+    }, generation);
   }
 
   normalizeSolanaTransaction(transaction, ca, signature) {
@@ -279,36 +291,47 @@ export class MarketFeed {
     };
   }
 
-  openSocket(url, { onOpen, onMessage }) {
+  openSocket(url, { onOpen, onMessage }, generation = this.connectionGeneration) {
+    if (!this.isCurrentConnection(generation)) return;
     if (!this.WebSocket) throw new Error('WebSocket non disponibile in questo browser.');
     const socket = new this.WebSocket(url);
     this.socket = socket;
     socket.addEventListener('open', () => {
+      if (!this.isCurrentConnection(generation) || this.socket !== socket) return;
       this.reconnectAttempt = 0;
       this.status('live', `WebSocket connesso: ${url}`);
       onOpen(socket);
     });
     socket.addEventListener('message', (event) => {
-      Promise.resolve().then(() => onMessage(JSON.parse(event.data))).catch((error) => this.status('degraded', error.message));
+      if (!this.isCurrentConnection(generation) || this.socket !== socket) return;
+      Promise.resolve().then(() => onMessage(JSON.parse(event.data))).catch((error) => {
+        if (this.isCurrentConnection(generation)) this.status('degraded', error.message);
+      });
     });
-    socket.addEventListener('error', () => this.status('degraded', 'Errore WebSocket; riconnessione automatica.'));
+    socket.addEventListener('error', () => {
+      if (this.isCurrentConnection(generation) && this.socket === socket) this.status('degraded', 'Errore WebSocket; riconnessione automatica.');
+    });
     socket.addEventListener('close', () => {
-      if (!this.running || this.socket !== socket) return;
-      this.scheduleReconnect();
+      if (!this.isCurrentConnection(generation) || this.socket !== socket) return;
+      this.scheduleReconnect(generation);
     });
   }
 
-  scheduleReconnect() {
-    if (!this.reconnectConfig || !this.running) return;
+  scheduleReconnect(generation = this.connectionGeneration) {
+    if (!this.reconnectConfig || !this.isCurrentConnection(generation)) return;
     const delay = Math.min(30_000, 1_000 * 2 ** this.reconnectAttempt++);
     this.status('reconnecting', `Nuovo tentativo tra ${Math.round(delay / 1000)} s`);
     clearTimeout(this.timer);
     this.timer = setTimeout(() => {
+      if (!this.reconnectConfig || !this.isCurrentConnection(generation)) return;
       const { source, ca, options } = this.reconnectConfig;
       this.status('connecting', 'Riconnessione feed');
-      if (source === 'pumpportal') this.connectPumpPortal(ca, options).catch((error) => this.status('degraded', error.message));
-      else if (source === 'solana') this.connectSolana(ca, options).catch((error) => this.status('degraded', error.message));
-      else if (source === 'dexscreener') this.connectDexScreener(ca, options).catch((error) => this.status('degraded', error.message));
+      const reportError = (error) => {
+        if (this.isCurrentConnection(generation)) this.status('degraded', error.message);
+      };
+      if (source === 'pumpportal') this.connectPumpPortal(ca, options, generation).catch(reportError);
+      else if (source === 'solana') this.connectSolana(ca, options, generation).catch(reportError);
+      else if (source === 'dexscreener') this.connectDexScreener(ca, options, generation).catch(reportError);
     }, delay);
   }
 
@@ -345,6 +368,7 @@ export class MarketFeed {
   }
 
   stop() {
+    this.connectionGeneration += 1;
     this.running = false;
     if (this.timer) {
       clearTimeout(this.timer);

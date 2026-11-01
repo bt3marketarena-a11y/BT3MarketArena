@@ -93,9 +93,9 @@ export class Orchestrator {
 
   async applyCloudState(state) {
     const revision = Number(state.revision) || 0;
-    if (revision === this.appliedCloudRevision) return;
+    if (revision <= this.appliedCloudRevision) return;
     this.appliedCloudRevision = revision;
-    const { revision: ignoredRevision, updatedAt: ignoredUpdatedAt, ...config } = state;
+    const { revision: ignoredRevision, updatedAt: ignoredUpdatedAt, storage: ignoredStorage, ...config } = state;
     this.config = { ...this.config, ...config };
     this.ui.currentConfig = { ...this.ui.currentConfig, ...this.config };
     this.match.roundDurationMs = Math.max(0, Number(this.config.roundDurationSec) || 0) * 1000;

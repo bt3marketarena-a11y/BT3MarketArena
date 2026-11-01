@@ -36,13 +36,31 @@ test('lo stato SSE riconnette il feed e ignora una revisione già applicata', as
     appliedCloudRevision: -1,
     connectFeed: async () => { connections += 1; },
   };
-  const state = { source: 'pumpportal', ca: VALID_CA, whaleThreshold: 20_000, roundDurationSec: 300, revision: 4 };
+  const state = { source: 'pumpportal', ca: VALID_CA, whaleThreshold: 20_000, roundDurationSec: 300, revision: 4, storage: 'redis' };
   await Orchestrator.prototype.applyCloudState.call(fake, state);
   await Orchestrator.prototype.applyCloudState.call(fake, state);
   assert.equal(connections, 1);
   assert.equal(fake.config.ca, VALID_CA);
+  assert.equal(Object.hasOwn(fake.config, 'storage'), false);
   assert.equal(fake.market.whaleThresholdUsd, 20_000);
   assert.equal(fake.match.roundDurationMs, 300_000);
+});
+
+test('una revisione cloud più vecchia non ripristina il CA precedente', async () => {
+  const connections = [];
+  const fake = {
+    config: {},
+    ui: { currentConfig: {}, setContract: () => {} },
+    match: { roundDurationMs: 0 },
+    market: { whaleThresholdUsd: 0 },
+    appliedCloudRevision: -1,
+    connectFeed: async (config) => { connections.push(config.ca); },
+  };
+  await Orchestrator.prototype.applyCloudState.call(fake, { source: 'pumpportal', ca: VALID_CA, revision: 5 });
+  await Orchestrator.prototype.applyCloudState.call(fake, { source: 'pumpportal', ca: '11111111111111111111111111111112', revision: 4 });
+  assert.equal(fake.config.ca, VALID_CA);
+  assert.equal(fake.appliedCloudRevision, 5);
+  assert.deepEqual(connections, [VALID_CA]);
 });
 
 test('il form admin contiene una password non persistente', async () => {

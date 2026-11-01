@@ -36,3 +36,22 @@ test('lo stato rifiuta segreti, mint e sorgenti non validi', async () => {
   await assert.rejects(store.update({ source: 'pumpportal', ca: 'not-a-mint' }), /mint Solana/);
   await assert.rejects(store.update({ source: 'unknown' }), /Sorgente/);
 });
+
+test('lo store Redis condivide CA e revisione senza filesystem', async () => {
+  const { createRedisStateStore } = await import('../redisCloudState.mjs');
+  const values = new Map();
+  const client = {
+    get: async (key) => values.get(key) ?? null,
+    set: async (key, value) => { values.set(key, value); },
+  };
+  const store = createRedisStateStore({ client, now: () => '2026-11-01T00:00:00.000Z' });
+  assert.equal(store.mode, 'redis');
+  assert.equal((await store.get()).source, 'simulation');
+  const updated = await store.update({ source: 'pumpportal', ca: VALID_CA });
+  assert.equal(updated.ca, VALID_CA);
+  assert.equal(updated.revision, 1);
+  assert.equal(updated.updatedAt, '2026-11-01T00:00:00.000Z');
+  const anotherInstance = createRedisStateStore({ client });
+  assert.equal((await anotherInstance.get()).ca, VALID_CA);
+  assert.equal(Object.hasOwn(updated, 'adminKey'), false);
+});

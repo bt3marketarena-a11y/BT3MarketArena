@@ -29,7 +29,9 @@ test('la Function API Vercel non avvia listener né scrive sul disco', async (t)
   const base = `http://127.0.0.1:${server.address().port}`;
   const state = await fetch(`${base}/api/state`);
   assert.equal(state.status, 200);
-  assert.equal((await state.json()).source, 'simulation');
+  const publicState = await state.json();
+  assert.equal(publicState.source, 'simulation');
+  assert.equal(publicState.storage, 'memory');
   const mutation = await fetch(`${base}/api/state`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-admin-key' },
