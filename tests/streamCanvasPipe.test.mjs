@@ -78,3 +78,10 @@ test('la registrazione aspetta l AudioContext del gioco prima di partire', async
   const wait = source.indexOf('window.__BT3_AUDIO_TAPS__?.size > 0');
   assert.ok(wait > 0 && wait < source.indexOf('const recorder = await startTabRecorder(page);'));
 });
+
+test('una partita ferma nella stessa fase per oltre 10 minuti riapre la sessione', async () => {
+  const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
+  assert.match(source, /const stallMs = Number\(env\.STREAM_STALL_MS\) \|\| 10 \* 60_000/);
+  assert.match(source, /state\?\.menuSequence === 'completed' && Date\.now\(\) - lastChangeAt > stallMs/);
+  assert.match(source, /round: window\.marketArena\?\.match\?\.round \?\? null/);
+});

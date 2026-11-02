@@ -143,6 +143,7 @@ async function readDiagnostics(page) {
     menuSequence: window.__BT3_MARKET_ARENA__?.menuSequence ?? null,
     automationError: window.__BT3_MARKET_ARENA__?.automationError ?? null,
     phase: window.marketArena?.match?.phase ?? null,
+    round: window.marketArena?.match?.round ?? null,
     visibility: document.visibilityState,
     renderer: (() => {
       const gl = document.createElement('canvas').getContext('webgl2');
@@ -232,13 +233,29 @@ export async function runSession(env = process.env) {
     // L'automazione nella pagina non riprova un errore dei menu prima del primo match:
     // la diretta resterebbe ferma su un menu. La sessione si chiude e il ciclo esterno
     // riapre il gioco da capo (la stream key resta nell'ambiente del processo).
+    // Rete di sicurezza 24/7: un match dura al massimo ~5 minuti, quindi la stessa fase e
+    // lo stesso round per oltre STREAM_STALL_MS indicano un blocco (menu non riconosciuto,
+    // popup inatteso): si riapre il gioco invece di restare fermi in diretta.
+    const stallMs = Number(env.STREAM_STALL_MS) || 10 * 60_000;
+    let lastSignature = '';
+    let lastChangeAt = Date.now();
+    const restartSession = (reason) => {
+      if (ended || ffmpeg.exitCode !== null) return;
+      console.error(`[BT3 stream] ${reason}: riavvio della sessione.`);
+      ended = reason;
+      ffmpeg.stdin.end();
+      setTimeout(() => ffmpeg.kill(), 5_000);
+    };
     const watchdog = setInterval(async () => {
       const state = await readDiagnostics(page).catch(() => null);
-      if (state?.automationError && state.menuSequence !== 'completed' && ffmpeg.exitCode === null) {
-        console.error(`[BT3 stream] menu bloccati prima del combattimento: riavvio della sessione. ${String(state.automationError).split('\n')[0]}`);
-        ended = 'menu bloccati';
-        ffmpeg.stdin.end();
-        setTimeout(() => ffmpeg.kill(), 5_000);
+      if (state?.automationError && state.menuSequence !== 'completed') {
+        restartSession(`menu bloccati prima del combattimento (${String(state.automationError).split('\n')[0]})`);
+        return;
+      }
+      const signature = `${state?.phase}/${state?.round}`;
+      if (signature !== lastSignature) { lastSignature = signature; lastChangeAt = Date.now(); return; }
+      if (state?.menuSequence === 'completed' && Date.now() - lastChangeAt > stallMs) {
+        restartSession(`partita ferma su ${signature} da oltre ${Math.round(stallMs / 60_000)} minuti`);
       }
     }, Number(env.STREAM_WATCHDOG_MS) || 10_000);
     const code = await ffmpegDone.finally(() => clearInterval(watchdog));

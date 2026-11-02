@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasPauseMenuFrame, hasResultsMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
+import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasExitPromptFrame, hasPauseMenuFrame, hasResultsMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
 
 export async function monitorPostMatch(page, {
   capture,
@@ -35,7 +35,9 @@ export async function monitorPostMatch(page, {
       }
       if (phase === 'fighting') {
         const png = PNG.sync.read(await capture(page));
-        const resultsMenu = hasResultsMenuFrame(png);
+        // EXIT? in combattimento significa che il menu finale è già passato (es. non
+        // riconosciuto su quello stage): il post-match lo chiude su No e riprende il roster.
+        const resultsMenu = hasResultsMenuFrame(png) || hasExitPromptFrame(png);
         const pauseMenu = !resultsMenu && hasPauseMenuFrame(png);
         const activeCombat = hasActiveCombatFrame(png);
         const health = readCombatHealth(png);

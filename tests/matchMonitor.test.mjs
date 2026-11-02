@@ -176,3 +176,31 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
   assert.deepEqual(notifyAt, [3]);
   assert.deepEqual(inputLocksAt, [2, 3], 'il blocco deve precedere il menu finale e restare attivo sui risultati');
 });
+
+test('un popup EXIT durante il combattimento chiude il match invece di bloccare la diretta', async () => {
+  const png = new PNG({ width: 960, height: 540 });
+  const paint = (x0, x1, y0, y1, [red, green, blue]) => {
+    for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
+      const offset = (y * png.width + x) * 4;
+      png.data[offset] = red; png.data[offset + 1] = green; png.data[offset + 2] = blue; png.data[offset + 3] = 255;
+    }
+  };
+  paint(0, 960, 0, 540, [35, 130, 55]);
+  paint(300, 660, 195, 340, [12, 35, 55]);
+  paint(440, 520, 270, 282, [220, 225, 230]);
+  paint(440, 520, 302, 314, [230, 220, 40]);
+  let closed = false;
+  const evaluations = [];
+  const page = {
+    isClosed: () => closed,
+    waitForTimeout: async () => { closed = true; },
+    keyboard: { down: () => {}, up: () => {} },
+    evaluate: async (fn) => {
+      evaluations.push(fn.toString());
+      if (fn.toString().includes('phase: window.marketArena')) return { phase: 'fighting', round: 1, durationMs: 0, features: { autoRematch: true, visualKO: true } };
+      return undefined;
+    },
+  };
+  await monitorPostMatch(page, { capture: async () => PNG.sync.write(png) });
+  assert.equal(evaluations.some((source) => source.includes('notifyKO')), true);
+});
