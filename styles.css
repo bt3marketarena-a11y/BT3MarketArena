@@ -89,3 +89,6 @@ canvas{position:fixed!important;inset:0!important;width:100vw!important;height:1
 
 /* L'HUD va in onda: niente pulsante admin visibile agli spettatori (F2 resta per l'operatore). */
 #admin-open{display:none!important}
+
+/* Marchio BT3 nell'HUD, coerente con sito, logo e copertina. */
+.brand-bt3{font-weight:900;font-style:italic;background:linear-gradient(180deg,#fff6c8,#ffd23f 35%,#ff8a1f 70%,#e2470e);-webkit-background-clip:text;background-clip:text;color:transparent}

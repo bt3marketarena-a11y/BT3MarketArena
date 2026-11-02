@@ -192,22 +192,26 @@ export class MarketFeed {
       try {
         const pair = await this.fetchDexPair(ca);
         if (!this.isCurrentConnection(generation)) return;
-        const counts = { buys: safeNumber(pair.txns?.m5?.buys), sells: safeNumber(pair.txns?.m5?.sells) };
+        const counts = { pair: pair.pairAddress ?? null, buys: safeNumber(pair.txns?.m5?.buys), sells: safeNumber(pair.txns?.m5?.sells) };
         this.latestPrice = safeNumber(pair.priceUsd, this.latestPrice);
         this.latestMarketCap = safeNumber(pair.marketCap ?? pair.fdv, this.latestMarketCap);
+        // Se cambia la coppia più liquida i conteggi non sono confrontabili: si riparte.
+        if (this.previousDexCounts && this.previousDexCounts.pair !== counts.pair) this.previousDexCounts = null;
         if (this.previousDexCounts) {
           const deltas = {
             BUY: Math.max(0, counts.buys - this.previousDexCounts.buys),
             SELL: Math.max(0, counts.sells - this.previousDexCounts.sells),
           };
-          const total = deltas.BUY + deltas.SELL;
+          // Il volume m5 copre 5 minuti: l'importo dei soli scambi nuovi è la media per
+          // scambio della finestra moltiplicata per i nuovi scambi, non l'intero volume.
+          const windowTrades = counts.buys + counts.sells;
+          const averageTradeUsd = windowTrades ? safeNumber(pair.volume?.m5) / windowTrades : 0;
           for (const side of ['BUY', 'SELL']) {
             if (!deltas[side]) continue;
-            const volume = safeNumber(pair.volume?.m5);
             this.emitTrade({
               id: `dex-${ca}-${Date.now()}-${side}`,
               side,
-              amountUsd: total ? volume * deltas[side] / total : 0,
+              amountUsd: averageTradeUsd * deltas[side],
               price: this.latestPrice,
               marketCap: this.latestMarketCap,
               timestamp: Date.now(),

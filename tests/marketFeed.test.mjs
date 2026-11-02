@@ -81,3 +81,33 @@ test('MarketFeed invoca fetch con globalThis come richiesto dal browser', async 
   const pair = await feed.fetchDexPair('So11111111111111111111111111111111111111112');
   assert.equal(pair.chainId, 'solana');
 });
+
+test('DexScreener emette solo gli scambi nuovi con importo medio, non il volume di 5 minuti', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const snapshots = [
+    { pairAddress: 'P1', txns: { m5: { buys: 100, sells: 100 } }, volume: { m5: 200_000 }, priceUsd: '94', marketCap: 1e9 },
+    { pairAddress: 'P1', txns: { m5: { buys: 103, sells: 101 } }, volume: { m5: 204_000 }, priceUsd: '94', marketCap: 1e9 },
+    { pairAddress: 'P2', txns: { m5: { buys: 5, sells: 900 } }, volume: { m5: 905_000 }, priceUsd: '94', marketCap: 1e9 },
+  ];
+  let call = 0;
+  const trades = [];
+  const feed = new MarketFeed({
+    onTrade: (trade) => trades.push(trade),
+    fetchImpl: async () => ({ ok: true, json: async () => ({ pairs: [{ chainId: 'solana', liquidity: { usd: 1 }, ...snapshots[Math.min(call++, snapshots.length - 1)] }] }) }),
+  });
+  await feed.connect('dexscreener', 'So11111111111111111111111111111111111111112', { pollMs: 2_000 });
+  t.mock.timers.tick(2_000);
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  const buy = trades.find((trade) => trade.side === 'BUY');
+  const sell = trades.find((trade) => trade.side === 'SELL');
+  assert.equal(buy.count, 3);
+  assert.equal(sell.count, 1);
+  assert.equal(buy.amountUsd, 3_000, 'media 1.000 $ per scambio × 3 nuovi');
+  assert.equal(sell.amountUsd, 1_000);
+  t.mock.timers.tick(2_000);
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(trades.length, 2, 'cambio di coppia: nessun delta falso da 899 vendite');
+  feed.stop();
+});
