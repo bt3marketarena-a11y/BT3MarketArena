@@ -26,31 +26,40 @@ function pauseFrame() {
   return png;
 }
 
-test('la pausa sospende i pad e preme Start senza dichiarare un KO', async () => {
+test('la pausa sospende i pad e preme Start una volta, senza raffiche né KO', async () => {
+  const originalNow = Date.now;
+  let now = 0;
+  Date.now = () => now;
   let closed = false;
-  let stateReads = 0;
+  let waits = 0;
   const keys = [];
   const evaluations = [];
   const page = {
     isClosed: () => closed,
-    waitForTimeout: async () => { closed = true; },
+    // Ogni attesa fa avanzare il tempo; dopo ~6 s simulati il monitor si ferma.
+    waitForTimeout: async (ms) => { now += ms; waits += 1; if (now >= 6_000) closed = true; },
     keyboard: {
-      down: (key) => { keys.push(`down:${key}`); },
-      up: (key) => { keys.push(`up:${key}`); },
+      down: (key) => { keys.push({ key: `down:${key}`, at: now }); },
+      up: (key) => { keys.push({ key: `up:${key}`, at: now }); },
     },
     evaluate: async (fn, arg) => {
       evaluations.push({ source: fn.toString(), arg });
-      stateReads += 1;
-      if (stateReads === 1) {
+      if (fn.toString().includes('phase: window.marketArena')) {
         return { phase: 'fighting', round: 1, durationMs: 0, features: { autoRematch: true, visualKO: true } };
       }
       return undefined;
     },
   };
-
-  await monitorPostMatch(page, { capture: async () => PNG.sync.write(pauseFrame()) });
-
-  assert.deepEqual(keys, ['down:Enter', 'up:Enter']);
+  try {
+    await monitorPostMatch(page, { capture: async () => PNG.sync.write(pauseFrame()) });
+  } finally {
+    Date.now = originalNow;
+  }
+  const presses = keys.filter(({ key }) => key === 'down:Enter').map(({ at }) => at);
+  assert.ok(presses.length >= 1, 'una pausa persistente viene ripresa');
+  assert.ok(presses.length <= 2, `al massimo due Start in 6 s, non ${presses.length}`);
+  for (let index = 1; index < presses.length; index += 1) assert.ok(presses[index] - presses[index - 1] >= 3_000);
+  assert.ok(waits > presses.length, 'il primo fotogramma di pausa non preme subito Start');
   assert.equal(evaluations.some(({ source }) => source.includes('notifyKO')), false);
   assert.equal(evaluations.some(({ source }) => source.includes("setMode(0, 'idle')")), true);
 });

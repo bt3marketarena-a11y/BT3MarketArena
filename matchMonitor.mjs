@@ -10,6 +10,10 @@ export async function monitorPostMatch(page, {
   let lastHealth = null;
   let inputsSuspended = false;
   let koPending = false;
+  // Start apre e chiude la pausa: premuto su un fotogramma in ritardo la riaprirebbe in
+  // loop. Serve la pausa in due controlli consecutivi e 3 s dall'ultima ripresa.
+  let pauseStreak = 0;
+  let lastResumeAt = -Infinity;
   const endDetector = new CombatEndDetector({ delayMs: 12_000 });
   const koDetector = new KnockoutDetector({ delayMs: 1_500 });
   while (!isClosed()) {
@@ -72,13 +76,21 @@ export async function monitorPostMatch(page, {
             });
             inputsSuspended = true;
           }
+          pauseStreak += 1;
+          if (pauseStreak < 2 || Date.now() - lastResumeAt < 3_000) {
+            await page.waitForTimeout(600);
+            continue;
+          }
           console.log('[BT3 round] pausa rilevata: ripresa con Start, nessun KO');
           await page.keyboard.down('Enter');
           await page.waitForTimeout(220);
           await page.keyboard.up('Enter');
-          await page.waitForTimeout(1_000);
+          lastResumeAt = Date.now();
+          pauseStreak = 0;
+          await page.waitForTimeout(1_500);
           continue;
         }
+        pauseStreak = 0;
         endDetector.observe(activeCombat);
         if (state.features.visualKO && koDetector.observe(health)) {
           koPending = true;
