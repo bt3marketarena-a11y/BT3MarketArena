@@ -225,7 +225,19 @@ export async function runSession(env = process.env) {
       await page.screenshot({ path: env.STREAM_DEBUG_SCREENSHOT });
     }
 
-    const code = await ffmpegDone;
+    // L'automazione nella pagina non riprova un errore dei menu prima del primo match:
+    // la diretta resterebbe ferma su un menu. La sessione si chiude e il ciclo esterno
+    // riapre il gioco da capo (la stream key resta nell'ambiente del processo).
+    const watchdog = setInterval(async () => {
+      const state = await readDiagnostics(page).catch(() => null);
+      if (state?.automationError && state.menuSequence !== 'completed' && ffmpeg.exitCode === null) {
+        console.error(`[BT3 stream] menu bloccati prima del combattimento: riavvio della sessione. ${String(state.automationError).split('\n')[0]}`);
+        ended = 'menu bloccati';
+        ffmpeg.stdin.end();
+        setTimeout(() => ffmpeg.kill(), 5_000);
+      }
+    }, Number(env.STREAM_WATCHDOG_MS) || 10_000);
+    const code = await ffmpegDone.finally(() => clearInterval(watchdog));
     const diagnostics = await readDiagnostics(page).catch(() => null);
     console.log(`[BT3 stream] FFmpeg terminato (${code}), ${bytes} byte dalla scheda${ended ? `, ${ended}` : ''}: ${JSON.stringify(diagnostics)}`);
     return { code, recorder, diagnostics, bytes };

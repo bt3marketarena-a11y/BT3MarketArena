@@ -65,3 +65,10 @@ test('in headless l audio arriva da WebAudio e la codifica può usare Quick Sync
   assert.match(qsv, /-c:v h264_qsv .*-pix_fmt nv12/);
   assert.doesNotMatch(qsv, /libx264/);
 });
+
+test('se i menu si bloccano prima del combattimento la sessione viene riaperta', async () => {
+  const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
+  assert.match(source, /state\?\.automationError && state\.menuSequence !== 'completed'/);
+  assert.match(source, /ffmpeg\.stdin\.end\(\);\s+setTimeout\(\(\) => ffmpeg\.kill\(\), 5_000\)/);
+  assert.match(source, /console\.error\('\[BT3 stream\] Sessione terminata: riavvio tra 10 secondi\.'\)/);
+});
