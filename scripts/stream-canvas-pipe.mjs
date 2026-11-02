@@ -218,6 +218,10 @@ export async function runSession(env = process.env) {
     });
     let ended = null;
     await page.exposeBinding('__bt3StreamEnded', (_source, reason) => { ended = reason; ffmpeg.stdin.end(); });
+    // In headless l'audio della scheda è muto: la registrazione parte quando il gioco ha
+    // creato il suo AudioContext, così la sorgente è il tap WebAudio e non il silenzio.
+    await page.waitForFunction(() => window.__BT3_AUDIO_TAPS__?.size > 0, null, { timeout: Number(env.STREAM_AUDIO_WAIT_MS) || 90_000 })
+      .catch(() => console.error('[BT3 stream] AudioContext del gioco non ancora creato: audio della scheda come ripiego.'));
     const recorder = await startTabRecorder(page);
     console.log(`[BT3 stream] cattura della sola scheda: ${JSON.stringify(recorder)}`);
     if (env.STREAM_DEBUG_SCREENSHOT) {

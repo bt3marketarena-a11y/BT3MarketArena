@@ -72,3 +72,9 @@ test('se i menu si bloccano prima del combattimento la sessione viene riaperta',
   assert.match(source, /ffmpeg\.stdin\.end\(\);\s+setTimeout\(\(\) => ffmpeg\.kill\(\), 5_000\)/);
   assert.match(source, /console\.error\('\[BT3 stream\] Sessione terminata: riavvio tra 10 secondi\.'\)/);
 });
+
+test('la registrazione aspetta l AudioContext del gioco prima di partire', async () => {
+  const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
+  const wait = source.indexOf('window.__BT3_AUDIO_TAPS__?.size > 0');
+  assert.ok(wait > 0 && wait < source.indexOf('const recorder = await startTabRecorder(page);'));
+});
