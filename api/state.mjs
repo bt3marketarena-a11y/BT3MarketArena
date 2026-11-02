@@ -1,9 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { CloudStateStore } from '../cloudState.mjs';
+import { Redis } from '@upstash/redis';
 import { createRedisStateStore, findRedisCredentials } from '../redisCloudState.mjs';
+import { clientIp, createFailureLimiter } from '../adminRateLimit.mjs';
 
 const redisCredentials = findRedisCredentials();
 const store = redisCredentials ? createRedisStateStore(redisCredentials) : new CloudStateStore({ stateFile: null });
+const limiter = createFailureLimiter({ client: redisCredentials ? new Redis(redisCredentials) : null });
 const sseClients = new Set();
 const publicState = (state) => ({ ...state, storage: store.mode });
 
@@ -62,7 +65,10 @@ export default async function handler(request, response) {
     }
     if (request.method === 'PATCH' || request.method === 'PUT') {
       if (!process.env.ADMIN_KEY) { sendJson(response, 503, { error: 'ADMIN_KEY non configurata sul server.' }); return; }
-      if (!authorized(request)) { sendJson(response, 401, { error: 'ADMIN_KEY non valida o assente.' }); return; }
+      // Troppi tentativi sbagliati dallo stesso IP: 15 minuti di blocco prima di confrontare la chiave.
+      const ip = clientIp(request);
+      if (await limiter.blocked(ip)) { sendJson(response, 429, { error: 'Troppi tentativi: riprova tra 15 minuti.' }); return; }
+      if (!authorized(request)) { await limiter.fail(ip); sendJson(response, 401, { error: 'ADMIN_KEY non valida o assente.' }); return; }
       const state = await store.update(await readJson(request));
       for (const client of sseClients) writeSse(client, state);
       sendJson(response, 200, publicState(state));

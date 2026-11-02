@@ -86,3 +86,6 @@ canvas{position:fixed!important;inset:0!important;width:100vw!important;height:1
 /* lab-speed.js del sito originale si attiva con qualsiasi parametro hud (anche hud=0) e scrive
    "FPS de presentación" in #hud e "Preparando recursos del combate…" in #lab-speed: fuori dalla live. */
 #lab-speed,#hud{display:none!important}
+
+/* L'HUD va in onda: niente pulsante admin visibile agli spettatori (F2 resta per l'operatore). */
+#admin-open{display:none!important}

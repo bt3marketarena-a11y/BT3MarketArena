@@ -6,9 +6,8 @@
   "rewrites": [
     { "source": "/api/events", "destination": "/api/state?events=1" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/admin", "destination": "/admin.html" },
     {
-      "source": "/:path((?!$|api(?:/|$)|admin(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$|build-manifest\\.json$|og-preview\\.png$).*)",
+      "source": "/:path((?!$|api(?:/|$)|admin(?:/|$)|assets(?:/|$)|ops-[a-z0-9]+(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$|build-manifest\\.json$|og-preview\\.png$).*)",
       "destination": "https://dragonballbt3.online/:path"
     }
   ],
@@ -16,6 +15,7 @@
     { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
     { "source": "/runtime.html", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
     { "source": "/build-manifest.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }] },
-    { "source": "/bt3-arena-bundle.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
+    { "source": "/bt3-arena-bundle.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+    { "source": "/ops-:slug(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }, { "key": "Cache-Control", "value": "no-store" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }
   ]
 }

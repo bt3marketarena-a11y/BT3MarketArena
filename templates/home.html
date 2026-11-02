@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>BT3 Market Arena — Live</title>
-  <meta name="description" content="Live 24/7: Dragon Ball battles driven by real-time market buys and sells. Watch the official BT3 Market Arena stream.">
-  <meta name="theme-color" content="#05080c">
+  <meta name="description" content="Live 24/7: fighting-game battles driven by real-time market buys and sells. Watch the official BT3 Market Arena stream.">
+  <meta name="theme-color" content="#05070d">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="BT3 Market Arena">
   <meta property="og:title" content="BT3 Market Arena — Live Market-Driven Battles 24/7">
@@ -15,110 +15,220 @@
   <meta property="og:image" content="https://bt3marketarena.xyz/og-preview.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Live Dragon Ball battle with the Market Arena buy and sell pressure HUD">
+  <meta property="og:image:alt" content="Live battle with the BT3 Market Arena buy and sell pressure HUD">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://bt3marketarena.xyz/og-preview.png">
   <meta name="twitter:site" content="@BT3MarketArena">
   <meta name="twitter:title" content="BT3 Market Arena — Live Market-Driven Battles 24/7">
   <meta name="twitter:description" content="Every buy powers P1, every sell powers P2. Watch the official live stream.">
+  <link rel="icon" href="/assets/logo.png">
   <style>
     :root {
-      --bg: #05080c;
-      --panel: rgba(9, 15, 22, .92);
-      --line: rgba(255, 255, 255, .14);
-      --text: #e8eef4;
-      --muted: #8b98a7;
+      --bg: #05070d;
+      --panel: rgba(10, 16, 26, .82);
+      --line: rgba(255, 255, 255, .12);
+      --text: #eaf2ff;
+      --muted: #93a1b5;
       --green: #35f2a0;
       --red: #ff4664;
+      --gold: #ffb020;
+      --blue: #6fb4ff;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
-    body {
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(1200px 500px at 50% -10%, rgba(53, 242, 160, .10), transparent 60%),
-        radial-gradient(900px 400px at 100% 100%, rgba(255, 70, 100, .08), transparent 60%),
-        var(--bg);
-      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-    }
-    .shell { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
-    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .bars { display: flex; gap: 3px; align-items: flex-end; height: 30px; }
-    .bars i { display: block; width: 6px; border-radius: 2px; transform: skewX(-12deg); }
-    .bars i:nth-child(1) { height: 60%; background: var(--green); }
-    .bars i:nth-child(2) { height: 100%; background: var(--green); }
-    .bars i:nth-child(3) { height: 80%; background: var(--red); }
-    .brand h1 { margin: 0; font-size: clamp(18px, 2.4vw, 26px); letter-spacing: .14em; font-weight: 500; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); }
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
+    a { color: inherit; }
+    .wrap { width: min(1200px, 100% - 32px); margin: 0 auto; }
+
+    /* Intestazione fissa */
+    .topbar { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px); background: rgba(5, 7, 13, .78); border-bottom: 1px solid var(--line); }
+    .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; flex-wrap: wrap; padding: 8px 0; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .brand img { width: 40px; height: 40px; border-radius: 50%; }
+    .brand h1 { margin: 0; font-size: 18px; letter-spacing: .12em; font-weight: 500; }
     .brand h1 b { font-weight: 800; }
-    .brand h1 .bt3 { font-weight: 900; font-style: italic; letter-spacing: .06em; background: linear-gradient(180deg, #fff6c8, #ffd23f 35%, #ff8a1f 70%, #e2470e); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px rgba(255,150,40,.55)); }
-    .live { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgba(255, 70, 100, .55); border-radius: 4px; color: #ffb3c0; font: 700 12px/1 ui-monospace, monospace; letter-spacing: .14em; }
+    .bt3 { font-weight: 900; font-style: italic; letter-spacing: .04em; background: linear-gradient(180deg, #fff6c8, #ffd23f 35%, #ff8a1f 70%, #e2470e); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .live { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid rgba(255, 70, 100, .55); border-radius: 4px; color: #ffb3c0; font: 700 12px/1 ui-monospace, monospace; letter-spacing: .14em; }
     .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 10px var(--red); animation: pulse 1.6s infinite; }
     @keyframes pulse { 50% { opacity: .35; } }
     .links { display: flex; flex-wrap: wrap; gap: 8px; }
-    a.button, button {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px;
-      border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text);
+    .button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text);
       font: 700 13px/1 ui-monospace, monospace; letter-spacing: .08em; text-decoration: none; cursor: pointer;
     }
-    a.button:hover, button:hover, a.button:focus-visible, button:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
-    a.kick { border-color: rgba(83, 252, 24, .5); }
-    .ca {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px;
-      border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
-    }
-    .ca .tag { padding: 4px 8px; border-radius: 3px; background: var(--green); color: #031b10; font: 800 12px/1 ui-monospace, monospace; letter-spacing: .1em; }
-    .ca code { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; font: 600 14px/1.4 ui-monospace, monospace; color: var(--text); }
+    .button:hover, .button:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
+    .button.primary { background: linear-gradient(180deg, #ffd23f, #ff8a1f); color: #1d0b02; border-color: transparent; }
+    .button.primary:hover, .button.primary:focus-visible { color: #1d0b02; filter: brightness(1.08); }
+
+    /* Hero */
+    .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+    /* Aura di energia solo CSS: la copertina contiene già il titolo e lo duplicherebbe. */
+    .hero::before { content: ""; position: absolute; left: 50%; top: 42%; width: 2000px; height: 2000px; transform: translate(-50%, -50%);
+      background: repeating-conic-gradient(from 0deg, rgba(255,150,40,.16) 0deg 3deg, transparent 3deg 10deg, rgba(70,150,255,.12) 10deg 12deg, transparent 12deg 20deg);
+      -webkit-mask-image: radial-gradient(circle, #000 6%, transparent 34%); mask-image: radial-gradient(circle, #000 6%, transparent 34%); }
+    .hero::after { content: ""; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 55% at 50% 38%, rgba(255,190,70,.20), transparent 70%),
+        radial-gradient(500px 320px at 0% 20%, rgba(53,242,160,.16), transparent 70%),
+        radial-gradient(520px 340px at 100% 85%, rgba(255,70,100,.18), transparent 70%),
+        linear-gradient(180deg, transparent 60%, var(--bg)); }
+    .hero .wrap { position: relative; z-index: 1; padding: clamp(48px, 9vw, 110px) 0 clamp(36px, 6vw, 70px); text-align: center; }
+    .hero h2 { margin: 0; font-size: clamp(40px, 8vw, 92px); line-height: .95; font-weight: 900; letter-spacing: .02em; }
+    .hero h2 .bt3 { display: block; font-size: 1.25em; filter: drop-shadow(0 0 18px rgba(255, 150, 40, .55)); }
+    .hero p.lead { margin: 18px auto 0; max-width: 700px; font-size: clamp(17px, 2.2vw, 22px); color: #cfd9ea; }
+    .hero p.lead .buy { color: var(--green); font-weight: 800; }
+    .hero p.lead .sell { color: var(--red); font-weight: 800; }
+    .hero .cta { margin-top: 28px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+    /* Barra del contract address */
+    .ca { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; margin-top: 24px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+    .ca .tag { padding: 5px 9px; border-radius: 4px; background: var(--green); color: #031b10; font: 800 12px/1 ui-monospace, monospace; letter-spacing: .1em; }
+    .ca code { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; font: 600 15px/1.4 ui-monospace, monospace; }
     .ca.waiting code { color: var(--muted); letter-spacing: .12em; }
     .ca .actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .ca .actions[hidden] { display: none; }
-    .player { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+
+    /* Sezioni: l'ordine cambia da solo quando il token è lanciato */
+    main { display: flex; flex-direction: column; gap: 56px; padding: 36px 0 64px; }
+    section h3 { margin: 0 0 6px; font-size: clamp(24px, 3.4vw, 34px); letter-spacing: .02em; }
+    section .kicker { margin: 0 0 18px; color: var(--muted); }
+    #live { order: 1; }
+    #token { order: 3; }
+    #how { order: 2; }
+    #gallery { order: 4; }
+    body.launched #token { order: 0; }
+
+    .player { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 24px 70px rgba(0, 0, 0, .55); }
     .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-    footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
-    footer p { margin: 0; max-width: 760px; }
-    .admin { width: 44px; padding: 0; font-size: 18px; }
-    @media (max-width: 600px) {
-      .links { width: 100%; }
-      .links a.button { flex: 1 1 0; }
+
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .step { padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .step .icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; font: 800 18px/1 ui-monospace, monospace; }
+    .step h4 { margin: 14px 0 6px; font-size: 18px; }
+    .step p { margin: 0; color: var(--muted); font-size: 15px; }
+    .step.buy .icon { background: rgba(53, 242, 160, .14); color: var(--green); }
+    .step.sell .icon { background: rgba(255, 70, 100, .14); color: var(--red); }
+    .step.whale .icon { background: rgba(255, 176, 32, .14); color: var(--gold); }
+    .step.loop .icon { background: rgba(111, 180, 255, .14); color: var(--blue); }
+
+    .gallery { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+    .gallery figure { margin: 0; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #000; grid-column: span 2; }
+    .gallery figure.wide { grid-column: span 3; }
+    .gallery img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; transition: transform .35s ease; }
+    .gallery figure:hover img { transform: scale(1.04); }
+    .gallery figcaption { position: absolute; left: 10px; bottom: 10px; padding: 4px 8px; border-radius: 4px; background: rgba(5, 7, 13, .8); font: 700 11px/1 ui-monospace, monospace; letter-spacing: .1em; }
+
+    .token-card { display: grid; gap: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .token-card .soon { font: 800 clamp(18px, 3vw, 26px)/1.2 ui-monospace, monospace; letter-spacing: .1em; color: var(--gold); }
+    .chart { position: relative; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+    .chart iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    [hidden] { display: none !important; }
+
+    footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 13px; }
+    footer .wrap { display: grid; gap: 10px; }
+    footer p { margin: 0; }
+
+    @media (max-width: 760px) {
+      .gallery { grid-template-columns: 1fr 1fr; }
+      .gallery figure, .gallery figure.wide { grid-column: span 1; }
+      .gallery figure:first-child { grid-column: span 2; }
       .ca .actions { width: 100%; }
       .ca .actions > * { flex: 1 1 0; }
+      .topbar .links { width: 100%; }
+      .topbar .links .button { flex: 1 1 0; }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <header>
-      <div class="brand">
-        <div class="bars" aria-hidden="true"><i></i><i></i><i></i></div>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="#top" aria-label="BT3 Market Arena home">
+        <img src="/assets/logo.png" alt="" width="40" height="40">
         <h1><span class="bt3">BT3</span> MARKET <b>ARENA</b></h1>
         <span class="live">LIVE</span>
-      </div>
+      </a>
       <nav class="links" aria-label="Official channels">
-        <a class="button" href="https://x.com/BT3MarketArena" target="_blank" rel="noopener">𝕏 Follow on X</a>
-        <a class="button kick" href="https://kick.com/bt3marketarena" target="_blank" rel="noopener">Watch on Kick</a>
+        <a class="button" href="https://x.com/BT3MarketArena" target="_blank" rel="noopener">𝕏 Follow</a>
+        <a class="button" href="https://kick.com/bt3marketarena" target="_blank" rel="noopener">Kick</a>
       </nav>
-    </header>
+    </div>
+  </header>
 
-    <section id="ca-bar" class="ca waiting" aria-live="polite">
-      <span class="tag">CA</span>
-      <code id="ca-value">PRE-LAUNCH / WAITING FOR CA</code>
-      <div id="ca-actions" class="actions" hidden>
-        <button id="ca-copy" type="button">Copy CA</button>
-        <a id="ca-dex" class="button" target="_blank" rel="noopener">DexScreener</a>
-        <a id="ca-pump" class="button" target="_blank" rel="noopener">Pump.fun</a>
+  <section class="hero" id="top">
+    <div class="wrap">
+      <h2><span class="bt3">BT3</span>MARKET ARENA</h2>
+      <p class="lead">The market fights live, 24/7. Every <span class="buy">BUY</span> powers P1, every <span class="sell">SELL</span> powers P2 — and one live match plays out for everyone.</p>
+      <div class="cta">
+        <a class="button primary" href="#live">▶ Watch the live battle</a>
+        <a id="cta-follow" class="button" href="https://x.com/BT3MarketArena" target="_blank" rel="noopener">Follow for the launch</a>
+      </div>
+      <div id="ca-bar" class="ca waiting" aria-live="polite">
+        <span class="tag">CA</span>
+        <code id="ca-value">PRE-LAUNCH / WAITING FOR CA</code>
+        <div id="ca-actions" class="actions" hidden>
+          <button id="ca-copy" class="button" type="button">Copy CA</button>
+          <a id="ca-dex" class="button" target="_blank" rel="noopener">DexScreener</a>
+          <a id="ca-pump" class="button" target="_blank" rel="noopener">Pump.fun</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <section id="live" aria-labelledby="live-title">
+      <h3 id="live-title">Live arena</h3>
+      <p class="kicker">The same match for every viewer. Unmute the player to hear the fight.</p>
+      <div class="player">
+        <!-- muted=true: i browser bloccano l'autoplay con audio; lo spettatore attiva il suono dal player. -->
+        <iframe src="https://player.kick.com/bt3marketarena?autoplay=true&amp;muted=true" title="BT3 Market Arena live stream on Kick" allowfullscreen allow="autoplay; fullscreen; picture-in-picture"></iframe>
       </div>
     </section>
 
-    <div class="player">
-      <!-- muted=true: i browser bloccano l'autoplay con audio; lo spettatore attiva il suono dal player. -->
-      <iframe src="https://player.kick.com/bt3marketarena?autoplay=true&amp;muted=true" title="BT3 Market Arena live stream on Kick" allowfullscreen allow="autoplay; fullscreen; picture-in-picture"></iframe>
-    </div>
+    <section id="how" aria-labelledby="how-title">
+      <h3 id="how-title">How the arena works</h3>
+      <p class="kicker">Real trades become real moves. No scripted damage, no fake health bars.</p>
+      <div class="steps">
+        <article class="step buy"><div class="icon">BUY</div><h4>Buys power P1</h4><p>Every buy on the token sends Player 1 on the attack, while Player 2 is left open.</p></article>
+        <article class="step sell"><div class="icon">SELL</div><h4>Sells power P2</h4><p>Every sell flips the fight: Player 2 strikes back and P1 takes the hits.</p></article>
+        <article class="step whale"><div class="icon">🐋</div><h4>Whales unleash ultimates</h4><p>Big orders trigger the heaviest finishing moves. The bigger the trade, the bigger the hit.</p></article>
+        <article class="step loop"><div class="icon">∞</div><h4>Endless random matches</h4><p>After every K.O. new fighters and a new stage are drawn at random. The arena never stops.</p></article>
+      </div>
+    </section>
 
-    <footer>
-      <p>One live match for everyone: every buy powers P1, every sell powers P2. Before launch the market data is simulated.</p>
-      <a class="button admin" href="/admin" aria-label="Open market admin" title="Market admin">⚙</a>
-    </footer>
-  </div>
+    <section id="token" aria-labelledby="token-title">
+      <h3 id="token-title">Token</h3>
+      <div class="token-card">
+        <div id="token-soon">
+          <div class="soon">CONTRACT ADDRESS DROPS AT LAUNCH</div>
+          <p class="kicker">Until then the arena runs on simulated market data. Follow <a href="https://x.com/BT3MarketArena" target="_blank" rel="noopener">@BT3MarketArena</a> to catch the launch.</p>
+        </div>
+        <div id="token-live" hidden>
+          <p class="kicker">The arena is now driven by real trades on this token.</p>
+          <div class="chart"><iframe id="token-chart" title="Live token chart on DexScreener" loading="lazy"></iframe></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gallery" aria-labelledby="gallery-title">
+      <h3 id="gallery-title">From the arena</h3>
+      <p class="kicker">Captured from the live stream, HUD included.</p>
+      <div class="gallery">
+        <figure class="wide"><img src="/assets/impact.jpg" alt="Heavy punch landing during a live match" loading="lazy" width="960" height="720"><figcaption>IMPACT</figcaption></figure>
+        <figure class="wide"><img src="/assets/blast.jpg" alt="Energy blast combo in the arena" loading="lazy" width="960" height="720"><figcaption>BLAST COMBO</figcaption></figure>
+        <figure><img src="/assets/fight-start.jpg" alt="Round start of a live match" loading="lazy" width="960" height="720"><figcaption>FIGHT!</figcaption></figure>
+        <figure><img src="/assets/combo.jpg" alt="Combo counter during the fight" loading="lazy" width="960" height="720"><figcaption>COMBO</figcaption></figure>
+        <figure><img src="/assets/clash.jpg" alt="Two fighters clashing mid-air" loading="lazy" width="960" height="720"><figcaption>CLASH</figcaption></figure>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p><b>BT3 Market Arena</b> — live market-driven battles. <a href="https://kick.com/bt3marketarena" target="_blank" rel="noopener">Kick</a> · <a href="https://x.com/BT3MarketArena" target="_blank" rel="noopener">X</a></p>
+      <p>Fan-made entertainment project, not affiliated with or endorsed by the game's publishers or rights holders. Nothing on this site is financial advice; crypto assets are volatile and you can lose what you put in.</p>
+    </div>
+  </footer>
 
   <script>
     (() => {
@@ -129,18 +239,30 @@
       const copy = document.getElementById('ca-copy');
       const dex = document.getElementById('ca-dex');
       const pump = document.getElementById('ca-pump');
+      const soon = document.getElementById('token-soon');
+      const live = document.getElementById('token-live');
+      const chart = document.getElementById('token-chart');
       let current = '';
 
+      // Con un CA valido la pagina si riorganizza: la sezione token sale in cima con il grafico.
       const render = (ca) => {
         if (ca === current) return;
         current = ca;
-        const live = MINT.test(ca);
-        bar.classList.toggle('waiting', !live);
-        value.textContent = live ? ca : 'PRE-LAUNCH / WAITING FOR CA';
-        actions.hidden = !live;
-        if (live) {
-          dex.href = `https://dexscreener.com/solana/${encodeURIComponent(ca)}`;
-          pump.href = `https://pump.fun/coin/${encodeURIComponent(ca)}`;
+        const launched = MINT.test(ca);
+        document.body.classList.toggle('launched', launched);
+        bar.classList.toggle('waiting', !launched);
+        value.textContent = launched ? ca : 'PRE-LAUNCH / WAITING FOR CA';
+        actions.hidden = !launched;
+        document.getElementById('cta-follow').textContent = launched ? 'Follow on X' : 'Follow for the launch';
+        soon.hidden = launched;
+        live.hidden = !launched;
+        if (launched) {
+          const encoded = encodeURIComponent(ca);
+          dex.href = `https://dexscreener.com/solana/${encoded}`;
+          pump.href = `https://pump.fun/coin/${encoded}`;
+          chart.src = `https://dexscreener.com/solana/${encoded}?embed=1&theme=dark&info=0`;
+        } else {
+          chart.removeAttribute('src');
         }
       };
 

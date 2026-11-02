@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { buildStaticVercel } from '../scripts/build-static-vercel.mjs';
 
@@ -17,11 +18,15 @@ test('la build Vercel genera home e runtime statici con bundle precompilato', as
     fetchImpl: async () => new Response(source, { status: 200 }),
     outputDir: path.join(directory, 'public'),
     fallbackFile: path.join(directory, 'missing-fallback.html'),
+    adminPath: 'ops-testsecret0123456789',
   });
   const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
   const runtime = await readFile(path.join(directory, 'public', 'runtime.html'), 'utf8');
   const bundle = await readFile(path.join(directory, 'public', 'bt3-arena-bundle.js'), 'utf8');
-  const admin = await readFile(path.join(directory, 'public', 'admin.html'), 'utf8');
+  // Il pannello esce soltanto al percorso segreto, mai come /admin.html pubblico.
+  const admin = await readFile(path.join(directory, 'public', 'ops-testsecret0123456789', 'index.html'), 'utf8');
+  assert.equal(existsSync(path.join(directory, 'public', 'admin.html')), false);
+  for (const asset of ['logo.png', 'cover.png', 'impact.jpg', 'blast.jpg']) assert.ok(existsSync(path.join(directory, 'public', 'assets', asset)), asset);
   assert.ok(runtime.indexOf('<script src="/bt3-arena-bundle.js?v=') < runtime.indexOf('<script src="/engine.js">'));
   // La home è la pagina della diretta condivisa: niente motore né bundle, solo il player Kick.
   assert.match(index, /<iframe src="https:\/\/player\.kick\.com\/bt3marketarena\?autoplay=true&amp;muted=true"/);
@@ -34,7 +39,9 @@ test('la build Vercel genera home e runtime statici con bundle precompilato', as
   for (const tag of ['og:title', 'og:description', 'twitter:card']) assert.match(index, new RegExp(`(property|name)="${tag}"`));
   assert.match(index, /fetch\('\/api\/state'/);
   assert.match(index, /https:\/\/x\.com\/BT3MarketArena/);
-  assert.match(index, /href="\/admin"/);
+  assert.doesNotMatch(index, /\/admin|ops-|⚙/, 'la home non espone il pannello admin');
+  assert.match(index, /body\.launched #token \{ order: 0; \}/);
+  assert.match(index, /dexscreener\.com\/solana\/\$\{encoded\}\?embed=1/);
   assert.ok(bundle.length > 1000);
   assert.match(admin, /Market Arena/);
 });
@@ -74,4 +81,15 @@ test('la build Vercel versiona il bundle e pubblica un manifest verificabile', a
   assert.ok(index.includes(`/bt3-arena-bundle.js?v=${hash}`));
   assert.ok(index.includes('<meta name="bt3-build" content="test-commit">'));
   assert.ok(index.indexOf(`/bt3-arena-bundle.js?v=${hash}`) < index.indexOf('/engine.js'));
+});
+
+test('senza ADMIN_PATH il pannello non viene pubblicato e un percorso debole è rifiutato', async (t) => {
+  const directory = await workspace(t);
+  const source = '<!doctype html><html><head></head><body><canvas></canvas></body></html>';
+  const options = { fetchImpl: async () => new Response(source, { status: 200 }), outputDir: path.join(directory, 'public'), fallbackFile: path.join(directory, 'missing.html') };
+  const result = await buildStaticVercel({ ...options, adminPath: '' });
+  assert.equal(result.admin, false);
+  assert.equal(existsSync(path.join(directory, 'public', 'admin.html')), false);
+  await assert.rejects(buildStaticVercel({ ...options, adminPath: 'admin' }), /ADMIN_PATH/);
+  await assert.rejects(buildStaticVercel({ ...options, adminPath: 'ops-short' }), /ADMIN_PATH/);
 });

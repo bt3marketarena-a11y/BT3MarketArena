@@ -1,10 +1,11 @@
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createInjectionBundle } from '../injectionBundle.mjs';
 
-const RUNTIME_URL = 'https://dragonballbt3.online/runtime.html?hud=0&embedded=0&lang=it&env=BT3_SCALE%3D1%2CBT3_INTERP%3D0';
+export const ADMIN_PATH_PATTERN = /^ops-[a-z0-9]{16,64}$/;
+const RUNTIME_URL ='https://dragonballbt3.online/runtime.html?hud=0&embedded=0&lang=it&env=BT3_SCALE%3D1%2CBT3_INTERP%3D0';
 
 function escapeAttribute(value) {
   return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -25,7 +26,11 @@ export async function buildStaticVercel({
   homeFile = fileURLToPath(new URL('../templates/home.html', import.meta.url)),
   commit = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? 'local',
   builtAt = new Date().toISOString(),
+  // Il pannello admin non ha un indirizzo pubblico: ADMIN_PATH è una variabile segreta di
+  // Vercel (es. ops-<casuale>) perché il repository è pubblico. Senza, il pannello non esce.
+  adminPath = process.env.ADMIN_PATH ?? '',
 } = {}) {
+  if (adminPath && !ADMIN_PATH_PATTERN.test(adminPath)) throw new Error('ADMIN_PATH deve essere ops- seguito da almeno 16 caratteri a-z0-9.');
   let html;
   let source = 'upstream';
   try {
@@ -44,17 +49,23 @@ export async function buildStaticVercel({
   const manifest = { commit: String(commit), bundleSha256, builtAt };
   const injected = injectExternalBundle(html, manifest);
   await mkdir(outputDir, { recursive: true });
+  await rm(path.join(outputDir, 'admin.html'), { force: true });
   // La home pubblica mostra la diretta condivisa: aprire il sito non deve avviare una
   // seconda partita privata. Il gioco resta su /runtime.html, usato dallo streamer.
   await Promise.all([
     copyFile(homeFile, path.join(outputDir, 'index.html')),
     copyFile(new URL('../templates/og-preview.png', import.meta.url), path.join(outputDir, 'og-preview.png')),
+    cp(fileURLToPath(new URL('../templates/assets/', import.meta.url)), path.join(outputDir, 'assets'), { recursive: true }),
     writeFile(path.join(outputDir, 'runtime.html'), injected),
     writeFile(path.join(outputDir, 'bt3-arena-bundle.js'), bundle),
     writeFile(path.join(outputDir, 'build-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`),
-    copyFile(new URL('../admin.html', import.meta.url), path.join(outputDir, 'admin.html')),
   ]);
-  return { source, outputDir, manifest };
+  if (adminPath) {
+    const adminDir = path.join(outputDir, adminPath);
+    await mkdir(adminDir, { recursive: true });
+    await copyFile(new URL('../admin.html', import.meta.url), path.join(adminDir, 'index.html'));
+  }
+  return { source, outputDir, manifest, admin: Boolean(adminPath) };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
