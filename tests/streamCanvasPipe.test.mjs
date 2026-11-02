@@ -66,6 +66,18 @@ test('in headless l audio arriva da WebAudio e la codifica può usare Quick Sync
   assert.doesNotMatch(qsv, /libx264/);
 });
 
+test('su portatili ibridi gioco e codifica usano la GPU NVIDIA con priorità bassa', async () => {
+  const nvenc = buildFfmpegArgs({ primary: PRIMARY, encoder: 'h264_nvenc' }).join(' ');
+  assert.match(nvenc, /-hwaccel cuda -f webm -i pipe:0/);
+  assert.match(nvenc, /-c:v h264_nvenc .*-rc cbr/);
+  assert.doesNotMatch(buildFfmpegArgs({ primary: PRIMARY, encoder: 'h264_qsv' }).join(' '), /hwaccel/);
+  const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
+  assert.match(source, /'--force_high_performance_gpu'/);
+  assert.match(source, /for \(const encoder of \['h264_nvenc', 'h264_qsv'\]\)/);
+  assert.match(source, /PRIORITY_BELOW_NORMAL/);
+  assert.match(source, /lowerPriority\(ffmpeg\.pid, env\)/);
+});
+
 test('se i menu si bloccano prima del combattimento la sessione viene riaperta', async () => {
   const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
   assert.match(source, /state\?\.automationError && state\.menuSequence !== 'completed'/);

@@ -5,6 +5,7 @@
 // pipeline. Gli URL RTMP contengono la stream key: non vengono mai stampati.
 import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
+import os from 'node:os';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -34,14 +35,18 @@ export function buildFfmpegArgs({ primary, secondary = '', durationSec = 0, vide
   return [
     '-hide_banner', '-loglevel', 'warning', '-y',
     // Unico ingresso: il WebM prodotto da MediaRecorder dentro la pagina.
+    // Con NVENC anche la decodifica del WebM resta sulla GPU NVIDIA.
+    ...(encoder === 'h264_nvenc' ? ['-hwaccel', 'cuda'] : []),
     '-f', 'webm', '-i', 'pipe:0',
     '-map', '0:v:0', '-map', '0:a:0?',
     ...(durationSec > 0 ? ['-t', String(durationSec)] : []),
     '-vf', 'scale=1920:1080:flags=bicubic,fps=60',
-    // Quick Sync sposta la codifica sulla GPU Intel: con libx264 la CPU condivisa rallentava il gioco.
-    ...(encoder === 'h264_qsv'
-      ? ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-look_ahead', '0', '-pix_fmt', 'nv12']
-      : ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-pix_fmt', 'yuv420p']),
+    // NVENC usa la GPU dedicata e lascia libera la Intel che disegna il desktop; Quick Sync
+    // resta il ripiego senza NVIDIA. Con libx264 la CPU condivisa rallentava il gioco.
+    ...({
+      h264_nvenc: ['-c:v', 'h264_nvenc', '-preset', 'p4', '-tune', 'll', '-rc', 'cbr', '-pix_fmt', 'yuv420p'],
+      h264_qsv: ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-look_ahead', '0', '-pix_fmt', 'nv12'],
+    }[encoder] ?? ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-pix_fmt', 'yuv420p']),
     '-b:v', videoBitrate, '-maxrate', videoBitrate, '-bufsize', `${kbps * 2}k`,
     '-g', '120', '-keyint_min', '120', '-sc_threshold', '0',
     '-c:a', 'aac', '-b:a', '160k', '-ar', '44100', '-ac', '2',
@@ -65,8 +70,11 @@ export function findFfmpeg(env = process.env) {
 
 export function pickEncoder(ffmpegPath, requested = '') {
   if (requested) return requested;
-  const probe = spawnSync(ffmpegPath, ['-hide_banner', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=60', '-t', '0.2', '-c:v', 'h264_qsv', '-f', 'null', '-'], { stdio: 'ignore' });
-  return probe.status === 0 ? 'h264_qsv' : 'libx264';
+  for (const encoder of ['h264_nvenc', 'h264_qsv']) {
+    const probe = spawnSync(ffmpegPath, ['-hide_banner', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=60', '-t', '0.2', '-c:v', encoder, '-f', 'null', '-'], { stdio: 'ignore' });
+    if (probe.status === 0) return encoder;
+  }
+  return 'libx264';
 }
 
 // Prima del motore: tutto ciò che il gioco invia a AudioContext.destination viene duplicato
@@ -177,7 +185,10 @@ export async function runSession(env = process.env) {
     ignoreDefaultArgs: ['--enable-automation'],
     args: [
       ...chromiumArgs({ windowPosition: env.STREAM_WINDOW_POSITION || '-2400,0' }),
-      ...(headless ? ['--force-device-scale-factor=1', '--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] : []),
+      ...(headless ? ['--force-device-scale-factor=1', '--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist',
+        // Sui portatili ibridi il gioco va sulla GPU dedicata: la Intel integrata disegna il
+        // desktop e, condivisa con lo streamer, rendeva lento tutto il PC.
+        '--force_high_performance_gpu'] : []),
     ],
   });
   let ffmpeg = null;
@@ -207,6 +218,7 @@ export async function runSession(env = process.env) {
 
     console.log(`[BT3 stream] encoder video: ${encoder}`);
     ffmpeg = spawn(ffmpegPath, ffmpegArgs, { cwd: ROOT, stdio: ['pipe', 'inherit', 'inherit'] });
+    lowerPriority(ffmpeg.pid, env);
     const ffmpegDone = new Promise((resolve) => ffmpeg.on('exit', (code) => resolve(code ?? 1)));
     // A fine registrazione FFmpeg chiude stdin mentre la pagina può ancora inviare chunk.
     ffmpeg.stdin.on('error', () => {});
@@ -268,7 +280,15 @@ export async function runSession(env = process.env) {
   }
 }
 
+// Priorità "sotto il normale": chi usa il PC durante la diretta ha sempre la precedenza.
+// I processi figli (Chromium) la ereditano dal processo Node. STREAM_PRIORITY=normal la disattiva.
+function lowerPriority(pid = 0, env = process.env) {
+  if (env.STREAM_PRIORITY === 'normal') return;
+  try { os.setPriority(pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch {}
+}
+
 async function main() {
+  lowerPriority();
   let stopping = false;
   process.on('SIGINT', () => { stopping = true; process.exit(0); });
   process.on('SIGTERM', () => { stopping = true; process.exit(0); });
