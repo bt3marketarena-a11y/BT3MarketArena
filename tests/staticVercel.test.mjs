@@ -22,8 +22,14 @@ test('la build Vercel genera home e runtime statici con bundle precompilato', as
   const runtime = await readFile(path.join(directory, 'public', 'runtime.html'), 'utf8');
   const bundle = await readFile(path.join(directory, 'public', 'bt3-arena-bundle.js'), 'utf8');
   const admin = await readFile(path.join(directory, 'public', 'admin.html'), 'utf8');
-  assert.equal(index, runtime);
-  assert.ok(index.indexOf('<script src="/bt3-arena-bundle.js?v=') < index.indexOf('<script src="/engine.js">'));
+  assert.ok(runtime.indexOf('<script src="/bt3-arena-bundle.js?v=') < runtime.indexOf('<script src="/engine.js">'));
+  // La home è la pagina della diretta condivisa: niente motore né bundle, solo il player Kick.
+  assert.match(index, /<iframe src="https:\/\/player\.kick\.com\/bt3marketarena\?autoplay=true&amp;muted=false"/);
+  assert.doesNotMatch(index, /bt3-arena-bundle|engine\.js|<canvas/);
+  for (const tag of ['og:title', 'og:description', 'twitter:card']) assert.match(index, new RegExp(`(property|name)="${tag}"`));
+  assert.match(index, /fetch\('\/api\/state'/);
+  assert.match(index, /https:\/\/x\.com\/BT3MarketArena/);
+  assert.match(index, /href="\/admin"/);
   assert.ok(bundle.length > 1000);
   assert.match(admin, /Market Arena/);
 });
@@ -38,10 +44,10 @@ test('la build Vercel usa il fallback HTML locale se upstream è offline', async
     outputDir: path.join(directory, 'public'),
     fallbackFile,
   });
-  const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
+  const runtime = await readFile(path.join(directory, 'public', 'runtime.html'), 'utf8');
   assert.equal(result.source, 'fallback');
-  assert.match(index, /<canvas id="canvas">/);
-  assert.match(index, /<script src="\/bt3-arena-bundle\.js\?v=[a-f0-9]{64}"><\/script>/);
+  assert.match(runtime, /<canvas id="canvas">/);
+  assert.match(runtime, /<script src="\/bt3-arena-bundle\.js\?v=[a-f0-9]{64}"><\/script>/);
 });
 
 test('la build Vercel versiona il bundle e pubblica un manifest verificabile', async (t) => {
@@ -54,7 +60,7 @@ test('la build Vercel versiona il bundle e pubblica un manifest verificabile', a
     commit: 'test-commit',
     builtAt: '2026-11-01T00:00:00.000Z',
   });
-  const index = await readFile(path.join(directory, 'public', 'index.html'), 'utf8');
+  const index = await readFile(path.join(directory, 'public', 'runtime.html'), 'utf8');
   const bundle = await readFile(path.join(directory, 'public', 'bt3-arena-bundle.js'), 'utf8');
   const manifest = JSON.parse(await readFile(path.join(directory, 'public', 'build-manifest.json'), 'utf8'));
   const { createHash } = await import('node:crypto');

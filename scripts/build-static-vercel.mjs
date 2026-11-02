@@ -22,6 +22,7 @@ export async function buildStaticVercel({
   fetchImpl = globalThis.fetch,
   outputDir = fileURLToPath(new URL('../public/', import.meta.url)),
   fallbackFile = fileURLToPath(new URL('../templates/runtime.fallback.html', import.meta.url)),
+  homeFile = fileURLToPath(new URL('../templates/home.html', import.meta.url)),
   commit = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? 'local',
   builtAt = new Date().toISOString(),
 } = {}) {
@@ -43,8 +44,10 @@ export async function buildStaticVercel({
   const manifest = { commit: String(commit), bundleSha256, builtAt };
   const injected = injectExternalBundle(html, manifest);
   await mkdir(outputDir, { recursive: true });
+  // La home pubblica mostra la diretta condivisa: aprire il sito non deve avviare una
+  // seconda partita privata. Il gioco resta su /runtime.html, usato dallo streamer.
   await Promise.all([
-    writeFile(path.join(outputDir, 'index.html'), injected),
+    copyFile(homeFile, path.join(outputDir, 'index.html')),
     writeFile(path.join(outputDir, 'runtime.html'), injected),
     writeFile(path.join(outputDir, 'bt3-arena-bundle.js'), bundle),
     writeFile(path.join(outputDir, 'build-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`),

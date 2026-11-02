@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BT3 Market Arena — Live</title>
+  <meta name="description" content="Live 24/7: Dragon Ball battles driven by real-time market buys and sells. Watch the official BT3 Market Arena stream.">
+  <meta name="theme-color" content="#05080c">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BT3 Market Arena">
+  <meta property="og:title" content="BT3 Market Arena — Live Market-Driven Battles 24/7">
+  <meta property="og:description" content="Every buy powers P1, every sell powers P2. Watch the official live stream.">
+  <meta property="og:url" content="https://bt-3-market-arena.vercel.app/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:site" content="@BT3MarketArena">
+  <meta name="twitter:title" content="BT3 Market Arena — Live Market-Driven Battles 24/7">
+  <meta name="twitter:description" content="Every buy powers P1, every sell powers P2. Watch the official live stream.">
+  <style>
+    :root {
+      --bg: #05080c;
+      --panel: rgba(9, 15, 22, .92);
+      --line: rgba(255, 255, 255, .14);
+      --text: #e8eef4;
+      --muted: #8b98a7;
+      --green: #35f2a0;
+      --red: #ff4664;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 500px at 50% -10%, rgba(53, 242, 160, .10), transparent 60%),
+        radial-gradient(900px 400px at 100% 100%, rgba(255, 70, 100, .08), transparent 60%),
+        var(--bg);
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+    .shell { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .bars { display: flex; gap: 3px; align-items: flex-end; height: 30px; }
+    .bars i { display: block; width: 6px; border-radius: 2px; transform: skewX(-12deg); }
+    .bars i:nth-child(1) { height: 60%; background: var(--green); }
+    .bars i:nth-child(2) { height: 100%; background: var(--green); }
+    .bars i:nth-child(3) { height: 80%; background: var(--red); }
+    .brand h1 { margin: 0; font-size: clamp(18px, 2.4vw, 26px); letter-spacing: .14em; font-weight: 500; }
+    .brand h1 b { font-weight: 800; }
+    .live { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgba(255, 70, 100, .55); border-radius: 4px; color: #ffb3c0; font: 700 12px/1 ui-monospace, monospace; letter-spacing: .14em; }
+    .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 10px var(--red); animation: pulse 1.6s infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .links { display: flex; flex-wrap: wrap; gap: 8px; }
+    a.button, button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text);
+      font: 700 13px/1 ui-monospace, monospace; letter-spacing: .08em; text-decoration: none; cursor: pointer;
+    }
+    a.button:hover, button:hover, a.button:focus-visible, button:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
+    a.kick { border-color: rgba(83, 252, 24, .5); }
+    .ca {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+    }
+    .ca .tag { padding: 4px 8px; border-radius: 3px; background: var(--green); color: #031b10; font: 800 12px/1 ui-monospace, monospace; letter-spacing: .1em; }
+    .ca code { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; font: 600 14px/1.4 ui-monospace, monospace; color: var(--text); }
+    .ca.waiting code { color: var(--muted); letter-spacing: .12em; }
+    .ca .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ca .actions[hidden] { display: none; }
+    .player { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #000; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+    .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    footer p { margin: 0; max-width: 760px; }
+    .admin { width: 44px; padding: 0; font-size: 18px; }
+    @media (max-width: 600px) {
+      .links { width: 100%; }
+      .links a.button { flex: 1 1 0; }
+      .ca .actions { width: 100%; }
+      .ca .actions > * { flex: 1 1 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="bars" aria-hidden="true"><i></i><i></i><i></i></div>
+        <h1>MARKET <b>ARENA</b></h1>
+        <span class="live">LIVE</span>
+      </div>
+      <nav class="links" aria-label="Official channels">
+        <a class="button" href="https://x.com/BT3MarketArena" target="_blank" rel="noopener">𝕏 Follow on X</a>
+        <a class="button kick" href="https://kick.com/bt3marketarena" target="_blank" rel="noopener">Watch on Kick</a>
+      </nav>
+    </header>
+
+    <section id="ca-bar" class="ca waiting" aria-live="polite">
+      <span class="tag">CA</span>
+      <code id="ca-value">PRE-LAUNCH / WAITING FOR CA</code>
+      <div id="ca-actions" class="actions" hidden>
+        <button id="ca-copy" type="button">Copy CA</button>
+        <a id="ca-dex" class="button" target="_blank" rel="noopener">DexScreener</a>
+        <a id="ca-pump" class="button" target="_blank" rel="noopener">Pump.fun</a>
+      </div>
+    </section>
+
+    <div class="player">
+      <iframe src="https://player.kick.com/bt3marketarena?autoplay=true&amp;muted=false" title="BT3 Market Arena live stream on Kick" allowfullscreen allow="autoplay; fullscreen; picture-in-picture"></iframe>
+    </div>
+
+    <footer>
+      <p>One live match for everyone: every buy powers P1, every sell powers P2. Before launch the market data is simulated.</p>
+      <a class="button admin" href="/admin" aria-label="Open market admin" title="Market admin">⚙</a>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const MINT = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+      const bar = document.getElementById('ca-bar');
+      const value = document.getElementById('ca-value');
+      const actions = document.getElementById('ca-actions');
+      const copy = document.getElementById('ca-copy');
+      const dex = document.getElementById('ca-dex');
+      const pump = document.getElementById('ca-pump');
+      let current = '';
+
+      const render = (ca) => {
+        if (ca === current) return;
+        current = ca;
+        const live = MINT.test(ca);
+        bar.classList.toggle('waiting', !live);
+        value.textContent = live ? ca : 'PRE-LAUNCH / WAITING FOR CA';
+        actions.hidden = !live;
+        if (live) {
+          dex.href = `https://dexscreener.com/solana/${encodeURIComponent(ca)}`;
+          pump.href = `https://pump.fun/coin/${encodeURIComponent(ca)}`;
+        }
+      };
+
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(current);
+          copy.textContent = 'Copied ✓';
+        } catch {
+          copy.textContent = 'Copy failed';
+        }
+        setTimeout(() => { copy.textContent = 'Copy CA'; }, 1500);
+      });
+
+      const poll = async () => {
+        try {
+          const response = await fetch('/api/state', { cache: 'no-store', headers: { Accept: 'application/json' } });
+          if (response.ok) {
+            const state = await response.json();
+            render(state.source !== 'simulation' ? String(state.ca ?? '').trim() : '');
+          }
+        } catch {}
+      };
+      poll();
+      setInterval(poll, 3000);
+    })();
+  </script>
+</body>
+</html>
