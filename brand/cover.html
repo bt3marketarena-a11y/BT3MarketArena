@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 1500px; height: 500px; background: #04060c; }
+  .cover { position: relative; width: 1500px; height: 500px; overflow: hidden; color: #eaf2ff;
+    font-family: "Segoe UI", Inter, system-ui, sans-serif;
+    background: linear-gradient(110deg, #061524 0%, #070912 45%, #170809 100%); }
+  /* Linee di velocità e aura da picchiaduro, tutte originali. */
+  .speed { position: absolute; inset: 0; background: repeating-linear-gradient(100deg, transparent 0 46px, rgba(255,255,255,.035) 46px 48px); }
+  .rays { position: absolute; left: 790px; top: 230px; width: 1700px; height: 1700px; transform: translate(-50%, -50%);
+    background: repeating-conic-gradient(from 0deg, rgba(255,150,40,.16) 0deg 3deg, transparent 3deg 10deg, rgba(70,150,255,.13) 10deg 12deg, transparent 12deg 20deg);
+    -webkit-mask-image: radial-gradient(circle, #000 8%, transparent 42%); mask-image: radial-gradient(circle, #000 8%, transparent 42%); }
+  .aura { position: absolute; left: 790px; top: 210px; width: 760px; height: 420px; transform: translate(-50%, -50%); border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(255,200,80,.35) 0%, rgba(255,120,30,.22) 38%, rgba(60,130,255,.14) 62%, transparent 72%); filter: blur(10px); }
+  .side-buy { position: absolute; left: 0; top: 0; bottom: 0; width: 380px; background: radial-gradient(420px 380px at 0% 30%, rgba(53,242,160,.22), transparent 70%); }
+  .side-sell { position: absolute; right: 0; top: 0; bottom: 0; width: 420px; background: radial-gradient(460px 400px at 100% 80%, rgba(255,70,100,.26), transparent 70%); }
+  svg.chart { position: absolute; inset: 0; width: 1500px; height: 500px; }
+  .title { position: absolute; left: 0; right: 0; top: 54px; text-align: center; }
+  .bt3 { display: inline-block; font-size: 168px; line-height: .9; font-weight: 900; font-style: italic; letter-spacing: 6px;
+    background: linear-gradient(180deg, #fff6c8 0%, #ffd23f 33%, #ff8a1f 68%, #e2470e 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 4px #2a0f05; filter: drop-shadow(0 0 22px rgba(255,150,40,.65)) drop-shadow(0 8px 0 #160803); }
+  .name { margin-top: 6px; font-size: 54px; font-weight: 900; letter-spacing: 16px; text-shadow: 0 0 18px rgba(70,150,255,.85); }
+  .name span { color: #6fb4ff; }
+  .tagline { margin-top: 16px; font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .tagline .buy { color: #35f2a0; } .tagline .sell { color: #ff4664; }
+  .live { position: absolute; right: 64px; top: 56px; display: flex; align-items: center; gap: 12px; padding: 12px 18px;
+    border: 2px solid rgba(255,70,100,.75); border-radius: 6px; font: 800 22px/1 ui-monospace, Consolas, monospace; letter-spacing: 5px; color: #ffc2cd; background: rgba(4,6,12,.7); }
+  .live::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: #ff4664; box-shadow: 0 0 16px #ff4664; }
+  .url { position: absolute; right: 64px; bottom: 50px; font: 700 26px/1 ui-monospace, Consolas, monospace; letter-spacing: 2px; }
+  .url span { color: #ffb020; }
+  .meter { position: absolute; left: 50%; bottom: 46px; width: 560px; transform: translateX(-50%); }
+  .meter .labels { display: flex; justify-content: space-between; font: 700 14px/1 ui-monospace, Consolas, monospace; letter-spacing: 3px; }
+  .meter .labels .b { color: #35f2a0; } .meter .labels .s { color: #ff4664; }
+  .meter .track { margin-top: 9px; height: 12px; border-radius: 6px; overflow: hidden; display: flex; }
+  .meter .track .b { width: 58%; background: linear-gradient(90deg, #0fbf7a, #35f2a0); }
+  .meter .track .s { flex: 1; background: linear-gradient(90deg, #ff4664, #d51f46); }
+</style></head>
+<body><div class="cover">
+  <div class="speed"></div>
+  <div class="side-buy"></div>
+  <div class="side-sell"></div>
+  <div class="rays"></div>
+  <div class="aura"></div>
+  <svg class="chart" viewBox="0 0 1500 500" aria-hidden="true">
+    <g opacity=".5" fill="#35f2a0" stroke="#35f2a0" stroke-width="3">
+      <line x1="60" y1="300" x2="60" y2="420"/><rect x="48" y="330" width="24" height="70" rx="3"/>
+      <line x1="110" y1="250" x2="110" y2="390"/><rect x="98" y="270" width="24" height="90" rx="3"/>
+      <line x1="160" y1="200" x2="160" y2="330"/><rect x="148" y="220" width="24" height="80" rx="3"/>
+      <line x1="210" y1="150" x2="210" y2="300"/><rect x="198" y="170" width="24" height="95" rx="3"/>
+      <line x1="260" y1="110" x2="260" y2="240"/><rect x="248" y="125" width="24" height="80" rx="3"/>
+    </g>
+    <g opacity=".5" fill="#ff4664" stroke="#ff4664" stroke-width="3">
+      <line x1="1250" y1="150" x2="1250" y2="280"/><rect x="1238" y="170" width="24" height="80" rx="3"/>
+      <line x1="1300" y1="200" x2="1300" y2="330"/><rect x="1288" y="215" width="24" height="85" rx="3"/>
+      <line x1="1350" y1="240" x2="1350" y2="380"/><rect x="1338" y="260" width="24" height="90" rx="3"/>
+    </g>
+  </svg>
+  <div class="live">LIVE 24/7</div>
+  <div class="title">
+    <div class="bt3">BT3</div>
+    <div class="name">MARKET <span>ARENA</span></div>
+    <div class="tagline"><span class="buy">BUY</span> powers P1 · <span class="sell">SELL</span> powers P2</div>
+  </div>
+  <div class="meter">
+    <div class="labels"><span class="b">BUY PRESSURE</span><span class="s">SELL PRESSURE</span></div>
+    <div class="track"><span class="b"></span><span class="s"></span></div>
+  </div>
+  <div class="url"><span>▶</span> bt3marketarena.xyz</div>
+</div></body></html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; width: 400px; height: 400px; background: #05070d; }
+  .tile { position: relative; width: 400px; height: 400px; overflow: hidden;
+    font-family: "Segoe UI", Inter, system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 46%, #1a1030 0%, #070a14 55%, #03050a 100%); }
+  /* Aura di energia: raggi conici arancio/blu dietro al marchio. */
+  .rays { position: absolute; left: 50%; top: 46%; width: 760px; height: 760px; transform: translate(-50%, -50%);
+    background: repeating-conic-gradient(from 0deg, rgba(255,150,40,.20) 0deg 5deg, transparent 5deg 15deg, rgba(70,150,255,.16) 15deg 19deg, transparent 19deg 30deg);
+    -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 58%); mask-image: radial-gradient(circle, #000 18%, transparent 58%); }
+  .aura { position: absolute; left: 50%; top: 44%; width: 300px; height: 300px; transform: translate(-50%, -50%); border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,214,90,.55) 0%, rgba(255,140,30,.35) 35%, rgba(60,130,255,.18) 62%, transparent 72%);
+    filter: blur(6px); }
+  .bars { position: absolute; left: 50%; top: 62px; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 12px; height: 132px; }
+  .bars i { display: block; width: 34px; border-radius: 6px; transform: skewX(-14deg); }
+  .bars i:nth-child(1) { height: 56%; background: linear-gradient(#a6ffe0, #35f2a0 45%, #0fbf7a); box-shadow: 0 0 26px rgba(53,242,160,.75); }
+  .bars i:nth-child(2) { height: 100%; background: linear-gradient(#a6ffe0, #35f2a0 45%, #0fbf7a); box-shadow: 0 0 30px rgba(53,242,160,.8); }
+  .bars i:nth-child(3) { height: 76%; background: linear-gradient(#ffb3c0, #ff4664 45%, #d51f46); box-shadow: 0 0 30px rgba(255,70,100,.8); }
+  .bt3 { position: absolute; left: 0; right: 0; top: 186px; text-align: center; font-size: 104px; line-height: 1; font-weight: 900; font-style: italic; letter-spacing: 4px;
+    background: linear-gradient(180deg, #fff6c8 0%, #ffd23f 35%, #ff8a1f 70%, #e2470e 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 3px #2a0f05; filter: drop-shadow(0 0 14px rgba(255,150,40,.7)) drop-shadow(0 6px 0 #160803); }
+  /* X ritaglia l'avatar a cerchio: la riga resta dentro il diametro utile. */
+  .sub { position: absolute; left: 0; right: 0; bottom: 56px; text-align: center; color: #eaf2ff; font-size: 23px; font-weight: 800; letter-spacing: 4px;
+    text-shadow: 0 0 12px rgba(70,150,255,.85); }
+  .sub span { color: #6fb4ff; }
+</style></head>
+<body><div class="tile">
+  <div class="rays"></div>
+  <div class="aura"></div>
+  <div class="bars"><i></i><i></i><i></i></div>
+  <div class="bt3">BT3</div>
+  <div class="sub">MARKET <span>ARENA</span></div>
+</div></body></html>
