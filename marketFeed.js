@@ -39,7 +39,8 @@ export function classifyTrade(amountUsd, whaleThresholdUsd = 10_000) {
 }
 
 export function normalizePumpTrade(raw, solUsdPrice) {
-  const sol = Number(raw.sol_amount) / 1_000_000_000;
+  // PumpPortal invia solAmount già in SOL; il vecchio formato usava sol_amount in lamport.
+  const sol = raw.solAmount !== undefined ? Number(raw.solAmount) : Number(raw.sol_amount) / 1_000_000_000;
   const side = String(raw.txType).toUpperCase();
   if (!['BUY', 'SELL'].includes(side) || !Number.isFinite(sol)) throw new Error('Evento PumpPortal non valido.');
   return {
@@ -170,14 +171,31 @@ export class MarketFeed {
     throw new Error(`Sorgente non supportata: ${source}`);
   }
 
-  async connectPumpPortal(ca, { solUsdPrice = null } = {}, generation = this.connectionGeneration) {
+  async connectPumpPortal(ca, { solUsdPrice = null, marketPollMs = 15_000 } = {}, generation = this.connectionGeneration) {
     const rate = solUsdPrice ?? await this.fetchSolUsdPrice();
     if (!this.isCurrentConnection(generation)) return;
+    // I trade portano il market cap solo quando avvengono: prezzo e market cap arrivano
+    // anche da DexScreener, così l'HUD resta aggiornato pure nei momenti senza scambi.
+    const refreshMarket = async () => {
+      try {
+        const pair = await this.fetchDexPair(ca);
+        if (!this.isCurrentConnection(generation)) return;
+        this.latestPrice = safeNumber(pair.priceUsd, this.latestPrice);
+        this.latestMarketCap = safeNumber(pair.marketCap ?? pair.fdv, this.latestMarketCap);
+        this.emitMarket();
+      } catch {}
+    };
+    await refreshMarket();
+    // Timer separato: this.timer è usato dalla riconnessione del WebSocket.
+    if (this.isCurrentConnection(generation)) this.marketTimer = setInterval(refreshMarket, Math.max(5_000, marketPollMs));
     const url = 'wss://pumpportal.fun/api/data';
     this.openSocket(url, {
       onOpen: (socket) => socket.send(JSON.stringify({ method: 'subscribeTokenTrade', keys: [ca] })),
       onMessage: (data) => {
-        if (!this.isCurrentConnection(generation) || !data.txType || !data.sol_amount) return;
+        if (!this.isCurrentConnection(generation)) return;
+        // Risposte del server senza trade (es. chiave API richiesta): visibili come stato, non ignorate.
+        if (!data.txType && data.message) { this.status('degraded', `PumpPortal: ${data.message}`); return; }
+        if (!data.txType || !(data.solAmount ?? data.sol_amount)) return;
         const event = normalizePumpTrade(data, rate);
         if (event.marketCap && this.supply) event.price = event.marketCap / this.supply;
         this.emitTrade(event);
@@ -379,6 +397,10 @@ export class MarketFeed {
       clearTimeout(this.timer);
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.marketTimer) {
+      clearInterval(this.marketTimer);
+      this.marketTimer = null;
     }
     if (this.socket) {
       const socket = this.socket;

@@ -111,3 +111,43 @@ test('DexScreener emette solo gli scambi nuovi con importo medio, non il volume 
   assert.equal(trades.length, 2, 'cambio di coppia: nessun delta falso da 899 vendite');
   feed.stop();
 });
+
+test('normalizePumpTrade legge il formato attuale di PumpPortal (solAmount in SOL)', () => {
+  const event = normalizePumpTrade({ signature: 'x', txType: 'sell', solAmount: 1.5, marketCapSol: 300 }, 100);
+  assert.equal(event.side, 'SELL');
+  assert.equal(event.amountUsd, 150);
+  assert.equal(event.marketCap, 30_000);
+});
+
+test('PumpPortal: market cap da DexScreener anche senza trade ed errori del server visibili', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const statuses = [];
+  const markets = [];
+  const sockets = [];
+  class FakeSocket {
+    constructor(url) { this.url = url; this.listeners = {}; this.sent = []; sockets.push(this); }
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
+    send(message) { this.sent.push(message); }
+    close() {}
+    emit(type, event) { (this.listeners[type] ?? []).forEach((fn) => fn(event)); }
+  }
+  let cap = 1_000_000;
+  const feed = new MarketFeed({
+    WebSocketImpl: FakeSocket,
+    onStatus: (status) => statuses.push(status),
+    onMarket: (market) => markets.push(market.marketCap),
+    fetchImpl: async () => ({ ok: true, json: async () => ({ pairs: [{ chainId: 'solana', priceUsd: '0.001', marketCap: cap, liquidity: { usd: 1 } }] }) }),
+  });
+  await feed.connect('pumpportal', 'FUvoZUa1FJa5bRRn4VYovJEMypYrWzpX4CdUK4DHpump', { solUsdPrice: 100, marketPollMs: 15_000 });
+  assert.ok(markets.includes(1_000_000), 'market cap iniziale senza trade');
+  cap = 2_000_000;
+  t.mock.timers.tick(15_000);
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(markets.includes(2_000_000), 'market cap aggiornato senza trade');
+  sockets[0].emit('open');
+  sockets[0].emit('message', { data: JSON.stringify({ message: 'API key required' }) });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(statuses.some((status) => status.state === 'degraded' && /API key required/.test(status.detail)));
+  feed.stop();
+});
