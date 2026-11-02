@@ -125,7 +125,10 @@ export function hasPauseMenuFrame(png) {
   const { darkRatio, brightText } = pausePanelStats(png);
   // Il menu 1P/2P Pause copre il centro con un pannello blu scuro e voci bianche.
   // La combinazione evita di classificare come pausa un'arena notturna o una nuvola.
-  return darkRatio > 0.45 && brightText > 24;
+  // Geometria 4:3 con bande nere: pannello più stretto, quattro voci; sei voci sono i risultati.
+  const items = readMenuLayout(png)?.items;
+  if (items === 6) return false;
+  return (darkRatio > 0.45 && brightText > 24) || items === 4;
 }
 
 function rosterTextCount(png, player, center) {
@@ -252,14 +255,101 @@ function brightRowTextCount(png, center) {
   return count;
 }
 
+function isMenuText(red, green, blue) {
+  const neutral = Math.min(red, green, blue) > 90 && Math.max(red, green, blue) - Math.min(red, green, blue) < 105;
+  return neutral || isMenuYellow(red, green, blue);
+}
+
+function isMenuYellow(red, green, blue) {
+  return red > 140 && green > 100 && blue < 120 && red > blue * 1.6 && green > blue * 1.3;
+}
+
+/**
+ * Il runtime attuale disegna il gioco in 4:3 con bande nere laterali: il pannello del
+ * menu occupa allora il 26-74% della larghezza e le voci sono più distanziate delle
+ * posizioni fisse tarate in origine. Qui l'area di gioco viene misurata e le voci
+ * vengono contate come righe di testo a passo regolare dentro il pannello scuro.
+ */
+export function readMenuLayout(png) {
+  const pixel = (x, y) => {
+    const offset = (y * png.width + x) * 4;
+    return [png.data[offset], png.data[offset + 1], png.data[offset + 2]];
+  };
+  const litColumn = (x) => {
+    let lit = 0;
+    for (let y = Math.floor(png.height * 0.3); y < png.height * 0.7; y += 6) if (Math.max(...pixel(x, y)) > 18) lit += 1;
+    return lit > 3;
+  };
+  let left = 0;
+  while (left < png.width / 2 && !litColumn(left)) left += 1;
+  let right = png.width - 1;
+  while (right > png.width / 2 && !litColumn(right)) right -= 1;
+  const gameWidth = right - left + 1;
+  if (gameWidth < png.width * 0.5) return null;
+  const gameX = (fraction) => Math.round(left + fraction * gameWidth);
+  const panelEdge = (minX, maxX) => {
+    let samples = 0;
+    let dark = 0;
+    for (let y = Math.floor(png.height * 0.4); y < png.height * 0.6; y += 3) {
+      for (let x = gameX(minX); x < gameX(maxX); x += 3) {
+        const [red, green, blue] = pixel(x, y);
+        if (Math.max(red, green, blue) < 105 && blue >= red) dark += 1;
+        samples += 1;
+      }
+    }
+    return samples ? dark / samples : 0;
+  };
+  if (panelEdge(0.2, 0.28) <= 0.35 || panelEdge(0.72, 0.8) <= 0.35) return null;
+  const scale = png.height / 540;
+  const lines = [];
+  let current = null;
+  for (let y = Math.floor(png.height * 0.12); y < png.height * 0.88; y += 1) {
+    let text = 0;
+    let yellow = 0;
+    for (let x = gameX(0.3); x < gameX(0.7); x += 2) {
+      const [red, green, blue] = pixel(x, y);
+      if (isMenuText(red, green, blue)) text += 1;
+      if (isMenuYellow(red, green, blue)) yellow += 1;
+    }
+    if (text >= 8 * scale) {
+      if (!current) { current = { top: y, bottom: y, yellow: 0 }; lines.push(current); }
+      current.bottom = y;
+      current.yellow += yellow;
+    } else {
+      current = null;
+    }
+  }
+  // Le voci sono alte ~12-15 px su 540: bordi sottili e titolo grande restano fuori.
+  const items = lines
+    .filter((line) => line.bottom - line.top >= 8 * scale && line.bottom - line.top <= 22 * scale)
+    .map((line) => ({ center: (line.top + line.bottom) / 2, yellow: line.yellow }));
+  // La sequenza più lunga a passo regolare è il menu; il resto è scenario o HUD.
+  let best = [];
+  for (let start = 0; start < items.length; start += 1) {
+    const run = [items[start]];
+    for (let index = start + 1; index < items.length; index += 1) {
+      const gap = items[index].center - run.at(-1).center;
+      if (gap >= 25 * scale && gap <= 42 * scale) run.push(items[index]);
+      else break;
+    }
+    if (run.length > best.length) best = run;
+  }
+  if (best.length < 2) return null;
+  const yellowCounts = best.map((item) => item.yellow);
+  const selected = yellowCounts.indexOf(Math.max(...yellowCounts));
+  return { items: best.length, selected: yellowCounts[selected] > 20 * scale ? selected : null };
+}
+
 export function hasResultsMenuFrame(png) {
+  if (hasActiveCombatFrame(png)) return false;
   const { darkRatio, brightText } = pausePanelStats(png);
   // Il menu finale ha sei voci, incluso Replay Data nelle ultime due righe.
   // Il normale menu pausa si ferma a quattro e non deve chiudere il round.
   const left = darkPanelRatio(png, 0.18, 0.28);
   const right = darkPanelRatio(png, 0.72, 0.82);
   const replayRows = brightRowTextCount(png, 342) > 20 && brightRowTextCount(png, 371) > 20;
-  return !hasActiveCombatFrame(png) && darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35 && replayRows;
+  if (darkRatio > 0.2 && brightText > 24 && left > 0.35 && right > 0.35 && replayRows) return true;
+  return readMenuLayout(png)?.items === 6;
 }
 
 export function hasExitPromptFrame(png) {
@@ -288,6 +378,8 @@ function yellowTextCount(png, center, minX = 0.2, maxX = 0.8) {
 
 export function readResultsMenuSelection(png) {
   if (!hasResultsMenuFrame(png)) return null;
+  const layout = readMenuLayout(png);
+  if (layout?.items === 6) return layout.selected;
   const counts = [225, 252, 284, 311, 342, 371].map((center) => yellowTextCount(png, center));
   const selected = counts.indexOf(Math.max(...counts));
   return counts[selected] > 20 ? selected : null;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import {
+  hasPauseMenuFrame,
   hasResultsMenuFrame,
   readExitPromptSelection,
   readResultsMenuSelection,
@@ -353,4 +354,29 @@ test('se P1 non muove il menu il driver prova P2 e conferma solo dopo il movimen
   } finally {
     restore();
   }
+});
+
+function pillarboxMenuFrame(items, selected = 0) {
+  // Geometria reale attuale: gioco 4:3 con bande nere, pannello 26-74% e voci a passo ~34 px.
+  const png = new PNG({ width: 960, height: 540 });
+  paint(png, 0, 0, 960, 540, [0, 0, 0]);
+  paint(png, 120, 0, 840, 540, [60, 140, 70]);
+  paint(png, 250, 125, 710, 410, [14, 34, 70]);
+  paint(png, 390, 152, 570, 182, [240, 150, 40]);
+  const first = items === 6 ? 218 : 236;
+  for (let index = 0; index < items; index += 1) {
+    const center = first + index * 34;
+    paint(png, 330, center - 6, 630, center + 7, index === selected ? [235, 215, 40] : [200, 205, 215]);
+  }
+  return png;
+}
+
+test('il menu risultati viene riconosciuto anche nella geometria 4:3 con bande nere', () => {
+  const results = pillarboxMenuFrame(6, 1);
+  assert.equal(hasResultsMenuFrame(results), true);
+  assert.equal(readResultsMenuSelection(results), 1);
+  assert.equal(hasPauseMenuFrame(results), false);
+  const pause = pillarboxMenuFrame(4, 0);
+  assert.equal(hasResultsMenuFrame(pause), false);
+  assert.equal(hasPauseMenuFrame(pause), true);
 });
