@@ -67,7 +67,7 @@ test('Vercel forza il routing statico e conserva soltanto la Function state', as
       { source: '/api/(.*)', destination: '/api/$1' },
       { source: '/admin', destination: '/admin.html' },
       {
-        source: '/:path((?!$|api(?:/|$)|admin(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$|build-manifest\\.json$).*)',
+        source: '/:path((?!$|api(?:/|$)|admin(?:/|$)|index\\.html$|runtime\\.html$|admin\\.html$|bt3-arena-bundle\\.js$|build-manifest\\.json$|og-preview\\.png$).*)',
         destination: 'https://dragonballbt3.online/:path',
       },
     ],

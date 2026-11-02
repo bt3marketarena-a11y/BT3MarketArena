@@ -24,7 +24,10 @@ test('la build Vercel genera home e runtime statici con bundle precompilato', as
   const admin = await readFile(path.join(directory, 'public', 'admin.html'), 'utf8');
   assert.ok(runtime.indexOf('<script src="/bt3-arena-bundle.js?v=') < runtime.indexOf('<script src="/engine.js">'));
   // La home è la pagina della diretta condivisa: niente motore né bundle, solo il player Kick.
-  assert.match(index, /<iframe src="https:\/\/player\.kick\.com\/bt3marketarena\?autoplay=true&amp;muted=false"/);
+  assert.match(index, /<iframe src="https:\/\/player\.kick\.com\/bt3marketarena\?autoplay=true&amp;muted=true"/);
+  assert.match(index, /<meta name="twitter:card" content="summary_large_image">/);
+  for (const tag of ['property="og:image"', 'name="twitter:image"']) assert.ok(index.includes(`${tag} content="https://bt-3-market-arena.vercel.app/og-preview.png"`), tag);
+  assert.ok((await readFile(path.join(directory, 'public', 'og-preview.png'))).length > 10_000);
   assert.doesNotMatch(index, /bt3-arena-bundle|engine\.js|<canvas/);
   for (const tag of ['og:title', 'og:description', 'twitter:card']) assert.match(index, new RegExp(`(property|name)="${tag}"`));
   assert.match(index, /fetch\('\/api\/state'/);

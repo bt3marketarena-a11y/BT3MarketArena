@@ -48,6 +48,7 @@ export async function buildStaticVercel({
   // seconda partita privata. Il gioco resta su /runtime.html, usato dallo streamer.
   await Promise.all([
     copyFile(homeFile, path.join(outputDir, 'index.html')),
+    copyFile(new URL('../templates/og-preview.png', import.meta.url), path.join(outputDir, 'og-preview.png')),
     writeFile(path.join(outputDir, 'runtime.html'), injected),
     writeFile(path.join(outputDir, 'bt3-arena-bundle.js'), bundle),
     writeFile(path.join(outputDir, 'build-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`),
