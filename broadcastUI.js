@@ -77,7 +77,9 @@ export class BroadcastUI {
   }
 
   setStatus({ state, detail, mode, contractAddress }) {
-    this.elements.feedStatus.innerHTML = `<i></i> ${state.toUpperCase()}`;
+    // Testo, non HTML: lo stato non deve mai poter iniettare markup nell'HUD in onda.
+    const status = this.elements.feedStatus;
+    status.replaceChildren(status.ownerDocument.createElement('i'), ` ${String(state).toUpperCase()}`);
     this.elements.feedStatus.title = detail;
     if (contractAddress) this.setContract(contractAddress, mode);
   }

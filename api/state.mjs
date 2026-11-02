@@ -77,9 +77,8 @@ export default async function handler(request, response) {
     sendJson(response, 405, { error: 'Metodo non consentito.' });
   } catch (error) {
     if (response.headersSent) { response.destroy(error); return; }
-    sendJson(response, 500, {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : null,
-    });
+    // Lo stack resta nei log di Vercel: in risposta esporrebbe percorsi e struttura del codice.
+    console.error('[BT3 state]', error);
+    sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) });
   }
 }

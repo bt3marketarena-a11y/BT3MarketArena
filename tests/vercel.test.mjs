@@ -41,7 +41,7 @@ test('la Function API Vercel non avvia listener né scrive sul disco', async (t)
   assert.equal(existsSync(process.env.STATE_FILE), false);
 });
 
-test('la Function API restituisce errori come JSON diagnostico', async () => {
+test('la Function API restituisce errori come JSON senza stack trace', async () => {
   const handler = await importHandler();
   const response = {
     headersSent: false,
@@ -52,12 +52,25 @@ test('la Function API restituisce errori come JSON diagnostico', async () => {
   assert.equal(response.status, 500);
   const error = JSON.parse(response.body);
   assert.match(error.error, /Invalid URL/);
-  assert.match(error.stack, /state\.mjs/);
+  assert.equal(error.stack, undefined, 'lo stack resta nei log, non nella risposta pubblica');
+  assert.doesNotMatch(response.body, /state\.mjs|node_modules|[A-Z]:\\/);
 });
 
 test('Vercel forza il routing statico e conserva soltanto la Function state', async () => {
-  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-  assert.deepEqual(config, {
+  const { headers: securityHeaders, ...config } = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const headerFor = (source, key) => securityHeaders.filter((rule) => rule.source === source).flatMap((rule) => rule.headers).find((header) => header.key === key)?.value;
+  // Home e pannello admin: niente framing (clickjacking), niente MIME sniffing, CSP restrittiva.
+  for (const source of ['/', '/index.html', '/ops-:slug(.*)']) {
+    assert.equal(headerFor(source, 'X-Frame-Options'), 'DENY', source);
+    assert.equal(headerFor(source, 'X-Content-Type-Options'), 'nosniff', source);
+    assert.match(headerFor(source, 'Content-Security-Policy'), /frame-ancestors 'none'.*object-src 'none'/, source);
+  }
+  assert.match(headerFor('/', 'Content-Security-Policy'), /frame-src https:\/\/player\.kick\.com https:\/\/dexscreener\.com/);
+  assert.equal(headerFor('/assets/:path*', 'X-Content-Type-Options'), 'nosniff');
+  assert.ok(securityHeaders.every((rule) => Array.isArray(rule.headers) && rule.headers.length > 0), 'nessuna regola vuota');
+  assert.equal(headerFor('/ops-:slug(.*)', 'X-Robots-Tag'), 'noindex, nofollow');
+  assert.equal(headerFor('/bt3-arena-bundle.js', 'Cache-Control'), 'public, max-age=31536000, immutable');
+  assert.deepEqual({ ...config, headers: [] }, {
     version: 2,
     framework: null,
     buildCommand: 'npm run build',
@@ -70,13 +83,7 @@ test('Vercel forza il routing statico e conserva soltanto la Function state', as
         destination: 'https://dragonballbt3.online/:path',
       },
     ],
-    headers: [
-      { source: '/index.html', headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }] },
-      { source: '/runtime.html', headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }] },
-      { source: '/build-manifest.json', headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }] },
-      { source: '/bt3-arena-bundle.js', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
-      { source: '/ops-:slug(.*)', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'Cache-Control', value: 'no-store' }, { key: 'Referrer-Policy', value: 'no-referrer' }] },
-    ],
+    headers: [],
   });
   assert.equal(existsSync(new URL('../api/state.mjs', import.meta.url)), true);
   assert.equal(existsSync(new URL('../api/index.mjs', import.meta.url)), false);

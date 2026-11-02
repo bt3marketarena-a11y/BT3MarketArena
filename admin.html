@@ -20,6 +20,7 @@
     <label>ADMIN_KEY<input name="adminKey" type="password" autocomplete="off" required></label>
     <button type="submit">Attiva il feed e aggiorna i client</button>
     <details><summary>Impostazioni avanzate</summary><div>
+      <p style="margin:0;color:#ffb020;font-size:13px">Attenzione: gli URL RPC sono pubblici (li legge il browser della diretta). Non inserire mai URL con chiavi API a pagamento.</p>
       <div class="grid"><label>WebSocket RPC<input name="wsUrl"></label><label>HTTP RPC<input name="httpUrl"></label></div>
       <div class="grid"><label>Fase offset<input name="phaseOffset" type="number" min="0"></label><label>Timeout opzionale (secondi, 0 = solo KO)<input name="roundDurationSec" type="number" min="0" value="0"></label></div>
       <div class="grid"><label>HP P1 offset<input name="hp1Offset" type="number" min="0"></label><label>HP P2 offset<input name="hp2Offset" type="number" min="0"></label></div>
