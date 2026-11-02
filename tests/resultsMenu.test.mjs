@@ -380,3 +380,28 @@ test('il menu risultati viene riconosciuto anche nella geometria 4:3 con bande n
   assert.equal(hasResultsMenuFrame(pause), false);
   assert.equal(hasPauseMenuFrame(pause), true);
 });
+
+test('con Character Select già evidenziato una conferma ignorata da P2 viene riprovata con P1', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const confirmedByP1 = events.some((event) => event.type === 'key' && event.args[0] === 'k' && !event.args[1]);
+    if (confirmedByP1) {
+      const png = new PNG({ width: 960, height: 540 });
+      paint(png, 0, 0, 960, 540, [35, 130, 55]);
+      paint(png, 120, 35, 840, 105, [20, 70, 190]);
+      paint(png, 120, 440, 840, 520, [170, 25, 100]);
+      return PNG.sync.write(png);
+    }
+    return PNG.sync.write(resultsFrame(1));
+  }, events);
+  try {
+    const result = await runRematchSequence(page, { menuPlayer: 1, rosterSequence: async () => ({ verified: true }) });
+    assert.deepEqual(result, { verified: true });
+    const crosses = events.filter((event) => event.type === 'button' && event.args[1] === 'cross' && event.args[2]).length;
+    const kPresses = events.filter((event) => event.type === 'key' && event.args[0] === 'k' && event.args[1]).length;
+    assert.equal(crosses, 3, 'tre tentativi con il pad di P2');
+    assert.equal(kPresses, 1, 'poi una conferma di P1, recepita');
+  } finally {
+    restore();
+  }
+});

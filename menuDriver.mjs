@@ -749,12 +749,24 @@ export async function runRematchSequence(page, options = {}) {
     if (!moved) throw new Error(`Nessun movimento del menu dalla voce ${previous + 1}; conferma bloccata.`);
   }
   if (selected !== 1) throw new Error('Character Select non raggiunto entro 12 movimenti verificati.');
-  const confirmationFrame = await confirmRosterState(
+  // Se la voce era già quella giusta nessun movimento ha rivelato il proprietario del menu:
+  // una conferma ignorata si riprova con l'altro giocatore, mai su un menu non verificato.
+  const confirmWith = (player) => confirmRosterState(
     page,
-    () => menuPlayer === 0 ? tap('k', 400) : padTap('cross', 400),
+    () => player === 0 ? tap('k', 400) : padTap('cross', 400),
     (png) => hasExitPromptFrame(png) || hasCharacterSelectionFrame(png),
     'Character Select / EXIT',
   );
+  let confirmationFrame;
+  try {
+    confirmationFrame = await confirmWith(menuPlayer);
+  } catch (error) {
+    const other = menuPlayer === 0 ? 1 : 0;
+    if (readResultsMenuSelection(PNG.sync.read(await page.screenshot())) !== 1) throw error;
+    progress(`conferma non recepita da P${menuPlayer + 1}: riprovo con P${other + 1}`);
+    confirmationFrame = await confirmWith(other);
+    menuPlayer = other;
+  }
   if (hasExitPromptFrame(confirmationFrame)) {
     // Character Select chiede EXIT? con default No: qui Yes è la conferma corretta.
     progress('conferma EXIT? → Yes per entrare davvero nel Character Select');
