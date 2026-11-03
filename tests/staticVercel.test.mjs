@@ -35,7 +35,9 @@ test('la build Vercel genera home e runtime statici con bundle precompilato', as
   assert.ok(index.includes('<link rel="canonical" href="https://bt3marketarena.xyz/">'));
   assert.ok(index.includes('<meta property="og:url" content="https://bt3marketarena.xyz/">'));
   assert.ok((await readFile(path.join(directory, 'public', 'og-preview.png'))).length > 10_000);
-  assert.doesNotMatch(index, /bt3-arena-bundle|engine\.js|<canvas/);
+  // La tela delle scintille della hero è decorativa: vietata solo quella del motore.
+  assert.doesNotMatch(index, /bt3-arena-bundle|engine\.js|<canvas id="canvas"/);
+  for (const clip of ['hero-loop.mp4', 'clip-blast.mp4', 'clip-ko.mp4']) assert.ok(existsSync(path.join(directory, 'public', 'assets', clip)), clip);
   for (const tag of ['og:title', 'og:description', 'twitter:card']) assert.match(index, new RegExp(`(property|name)="${tag}"`));
   assert.match(index, /fetch\('\/api\/state'/);
   assert.match(index, /https:\/\/x\.com\/BT3MarketArena/);
