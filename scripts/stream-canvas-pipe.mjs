@@ -249,6 +249,8 @@ export async function runSession(env = process.env) {
     // lo stesso round per oltre STREAM_STALL_MS indicano un blocco (menu non riconosciuto,
     // popup inatteso): si riapre il gioco invece di restare fermi in diretta.
     const stallMs = Number(env.STREAM_STALL_MS) || 10 * 60_000;
+    // Fuori dal combattimento (menu, KO, post-partita) 3 minuti fermi sono già un blocco certo.
+    const menuStallMs = Number(env.STREAM_MENU_STALL_MS) || 3 * 60_000;
     let lastSignature = '';
     let lastChangeAt = Date.now();
     const restartSession = (reason) => {
@@ -266,8 +268,9 @@ export async function runSession(env = process.env) {
       }
       const signature = `${state?.phase}/${state?.round}`;
       if (signature !== lastSignature) { lastSignature = signature; lastChangeAt = Date.now(); return; }
-      if (state?.menuSequence === 'completed' && Date.now() - lastChangeAt > stallMs) {
-        restartSession(`partita ferma su ${signature} da oltre ${Math.round(stallMs / 60_000)} minuti`);
+      const limit = state?.phase === 'fighting' ? stallMs : menuStallMs;
+      if (state?.menuSequence === 'completed' && Date.now() - lastChangeAt > limit) {
+        restartSession(`partita ferma su ${signature} da oltre ${Math.round(limit / 60_000)} minuti`);
       }
     }, Number(env.STREAM_WATCHDOG_MS) || 10_000);
     const code = await ffmpegDone.finally(() => clearInterval(watchdog));

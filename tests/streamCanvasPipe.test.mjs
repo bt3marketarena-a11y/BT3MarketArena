@@ -94,6 +94,8 @@ test('la registrazione aspetta l AudioContext del gioco prima di partire', async
 test('una partita ferma nella stessa fase per oltre 10 minuti riapre la sessione', async () => {
   const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
   assert.match(source, /const stallMs = Number\(env\.STREAM_STALL_MS\) \|\| 10 \* 60_000/);
-  assert.match(source, /state\?\.menuSequence === 'completed' && Date\.now\(\) - lastChangeAt > stallMs/);
+  assert.match(source, /const menuStallMs = Number\(env\.STREAM_MENU_STALL_MS\) \|\| 3 \* 60_000/);
+  assert.match(source, /const limit = state\?\.phase === 'fighting' \? stallMs : menuStallMs/);
+  assert.match(source, /state\?\.menuSequence === 'completed' && Date\.now\(\) - lastChangeAt > limit/);
   assert.match(source, /round: window\.marketArena\?\.match\?\.round \?\? null/);
 });
