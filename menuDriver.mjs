@@ -377,9 +377,11 @@ function yellowTextCount(png, center, minX = 0.2, maxX = 0.8) {
 }
 
 export function readResultsMenuSelection(png) {
-  if (!hasResultsMenuFrame(png)) return null;
+  // Dopo il KO (unico contesto di questa lettura) il timer può restare visibile dietro
+  // il pannello: le sei voci a passo regolare bastano, senza il filtro del combattimento.
   const layout = readMenuLayout(png);
   if (layout?.items === 6) return layout.selected;
+  if (!hasResultsMenuFrame(png)) return null;
   const counts = [225, 252, 284, 311, 342, 371].map((center) => yellowTextCount(png, center));
   const selected = counts.indexOf(Math.max(...counts));
   return counts[selected] > 20 ? selected : null;
@@ -736,8 +738,24 @@ export async function runRematchSequence(page, options = {}) {
         if (candidate === 0) await tap(key, 120);
         else await padTap(direction, 120);
         await wait(page, 350);
-        selected = readResultsMenuSelection(PNG.sync.read(await page.screenshot()));
-        if (selected === null) throw new Error('Menu risultati non più leggibile durante lo spostamento.');
+        // La voce evidenziata lampeggia: un fotogramma illeggibile non è un menu scomparso.
+        // Si rilegge per ~1 s; se il menu non torna, questo pad conta come "nessun movimento".
+        let frame = null;
+        selected = null;
+        for (let read = 0; read < 4 && selected === null; read += 1) {
+          if (read > 0) await wait(page, 250);
+          frame = PNG.sync.read(await page.screenshot());
+          selected = readResultsMenuSelection(frame);
+        }
+        if (selected === null) {
+          if (hasCharacterSelectionFrame(frame)) {
+            progress('Character Select apparso durante lo spostamento: ripresa del roster');
+            return rosterSequence(page, options);
+          }
+          progress(`menu risultati illeggibile dopo l'input di P${candidate + 1}: considero nessun movimento`);
+          selected = previous;
+          continue;
+        }
         if (selected !== previous) {
           if (candidate !== menuPlayer) progress(`input post-match recepito da P${candidate + 1}; fallback completato`);
           menuPlayer = candidate;

@@ -1,5 +1,5 @@
 import { PNG } from 'pngjs';
-import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasExitPromptFrame, hasPauseMenuFrame, hasResultsMenuFrame, readCombatHealth, runRematchSequence } from './menuDriver.mjs';
+import { CombatEndDetector, KnockoutDetector, hasActiveCombatFrame, hasCombatHudFrame, hasExitPromptFrame, hasPauseMenuFrame, hasResultsMenuFrame, readCombatHealth, readMenuLayout, runRematchSequence } from './menuDriver.mjs';
 
 export async function monitorPostMatch(page, {
   capture,
@@ -139,8 +139,18 @@ export async function monitorPostMatch(page, {
       }
       // Recovery: il driver può aver caricato il nuovo round senza aggiornare
       // la fase dopo un'attesa scaduta. Non rieseguire mai i menu sopra il match.
+      // Il menu finale si sovrappone alle HP ancora visibili: senza escluderlo il
+      // monitor contava un nuovo round inesistente. Due fotogrammi a 1 s di distanza.
+      const isLiveMatch = (frame) => hasCombatHudFrame(frame) && hasActiveCombatFrame(frame)
+        && !hasPauseMenuFrame(frame) && !hasResultsMenuFrame(frame) && !hasExitPromptFrame(frame)
+        && !(readMenuLayout(frame)?.items >= 4);
       const png = PNG.sync.read(await capture(page));
-      if (hasCombatHudFrame(png) && hasActiveCombatFrame(png) && !hasPauseMenuFrame(png)) {
+      let liveMatch = isLiveMatch(png);
+      if (liveMatch) {
+        await page.waitForTimeout(1_000);
+        liveMatch = isLiveMatch(PNG.sync.read(await capture(page)));
+      }
+      if (liveMatch) {
         console.log('[BT3 round] nuove HP e timer già visibili: sincronizzo HUD e pad');
         await page.evaluate(() => {
           window.marketArena.match.restart();

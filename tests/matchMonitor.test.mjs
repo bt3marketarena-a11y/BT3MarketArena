@@ -204,3 +204,36 @@ test('un popup EXIT durante il combattimento chiude il match invece di bloccare 
   await monitorPostMatch(page, { capture: async () => PNG.sync.write(png) });
   assert.equal(evaluations.some((source) => source.includes('notifyKO')), true);
 });
+
+test('il menu finale sopra le HP ancora visibili non conta come nuovo round', async () => {
+  const png = new PNG({ width: 960, height: 540 });
+  const paint = (x0, x1, y0, y1, [red, green, blue]) => {
+    for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
+      const offset = (y * png.width + x) * 4;
+      png.data[offset] = red; png.data[offset + 1] = green; png.data[offset + 2] = blue; png.data[offset + 3] = 255;
+    }
+  };
+  paint(0, 960, 0, 540, [35, 130, 55]);
+  paint(164, 412, 35, 55, [40, 210, 55]);
+  paint(548, 796, 35, 55, [40, 210, 55]);
+  paint(460, 500, 35, 70, [240, 240, 240]);
+  paint(170, 790, 145, 400, [12, 35, 55]);
+  [225, 252, 284, 311, 342, 371].forEach((center, index) => {
+    paint(310, 650, center - 5, center + 5, index === 0 ? [230, 220, 40] : [220, 225, 230]);
+  });
+  let closed = false;
+  const evaluations = [];
+  const page = {
+    isClosed: () => closed,
+    waitForTimeout: async () => { closed = true; },
+    screenshot: async () => PNG.sync.write(png),
+    keyboard: { down: () => {}, up: () => {} },
+    evaluate: async (fn) => {
+      evaluations.push(fn.toString());
+      if (evaluations.length === 1) return { phase: 'postmatch', round: 3, durationMs: 0, features: { autoRematch: true, visualKO: true } };
+      return undefined;
+    },
+  };
+  await monitorPostMatch(page, { capture: async () => PNG.sync.write(png) });
+  assert.equal(evaluations.some((source) => source.includes('match.restart()')), false);
+});
