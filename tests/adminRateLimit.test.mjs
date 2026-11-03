@@ -34,3 +34,8 @@ test('l IP del client arriva dal primo x-forwarded-for di Vercel', () => {
   assert.equal(clientIp({ headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' } }), '203.0.113.7');
   assert.equal(clientIp({ headers: { 'x-real-ip': '198.51.100.2' } }), '198.51.100.2');
 });
+
+test('su Vercel conta l IP scritto dalla piattaforma, non quello dichiarato dal client', () => {
+  assert.equal(clientIp({ headers: { 'x-vercel-forwarded-for': '203.0.113.9', 'x-forwarded-for': '1.2.3.4' } }), '203.0.113.9');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': 'a'.repeat(500) } }).length, 64);
+});

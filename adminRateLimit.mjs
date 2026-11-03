@@ -25,7 +25,10 @@ export function createFailureLimiter({ client = null, max = 10, windowSec = 900,
   };
 }
 
+// x-vercel-forwarded-for è scritto dalla piattaforma e non si può falsificare dal client;
+// gli altri restano come ripiego fuori da Vercel (sviluppo e test).
 export function clientIp(request) {
-  const forwarded = String(request.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
-  return forwarded || String(request.headers['x-real-ip'] ?? request.socket?.remoteAddress ?? 'unknown');
+  const first = (name) => String(request.headers[name] ?? '').split(',')[0].trim().slice(0, 64);
+  return first('x-vercel-forwarded-for') || first('x-real-ip') || first('x-forwarded-for')
+    || String(request.socket?.remoteAddress ?? 'unknown');
 }

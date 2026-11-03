@@ -51,7 +51,7 @@ test('la Function API restituisce errori come JSON senza stack trace', async () 
   await handler({ url: 'http://[invalid', headers: {}, on() {} }, response);
   assert.equal(response.status, 500);
   const error = JSON.parse(response.body);
-  assert.match(error.error, /Invalid URL/);
+  assert.equal(error.error, 'Errore interno del server.', 'il messaggio interno resta nei log');
   assert.equal(error.stack, undefined, 'lo stack resta nei log, non nella risposta pubblica');
   assert.doesNotMatch(response.body, /state\.mjs|node_modules|[A-Z]:\\/);
 });
@@ -100,4 +100,38 @@ test('Vercel non rileva un server Node implicito nella radice', () => {
       assert.equal(existsSync(entrypoint), false, `Entrypoint Vercel implicito: ${entrypoint.pathname}`);
     }
   }
+});
+
+test('la Function API rifiuta corpi non JSON, malformati e dati pericolosi', async (t) => {
+  const previous = process.env.ADMIN_KEY;
+  process.env.ADMIN_KEY = 'test-admin-key';
+  const handler = await importHandler();
+  const server = http.createServer(handler);
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(async () => {
+    server.close();
+    await once(server, 'close');
+    if (previous === undefined) delete process.env.ADMIN_KEY; else process.env.ADMIN_KEY = previous;
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const patch = (body, contentType = 'application/json') => fetch(`${base}/api/state`, {
+    method: 'PATCH', headers: { 'Content-Type': contentType, Authorization: 'Bearer test-admin-key' }, body,
+  });
+  assert.equal((await patch('{}', 'text/plain')).status, 415);
+  const malformed = await patch('{');
+  assert.equal(malformed.status, 400);
+  assert.equal((await malformed.json()).error, 'JSON non valido.');
+  assert.equal((await patch('[]')).status, 400);
+  assert.equal((await patch('null')).status, 400);
+  assert.equal((await patch(JSON.stringify({ wsUrl: 'ws://insecure.example' }))).status, 400);
+  assert.equal((await patch(JSON.stringify({ httpUrl: 'https://user:pass@rpc.example' }))).status, 400);
+  assert.equal((await patch(JSON.stringify({ httpUrl: 'javascript:alert(1)' }))).status, 400);
+  assert.equal((await patch(JSON.stringify({ ca: '<img src=x onerror=alert(1)>' }))).status, 400);
+  assert.equal((await patch(JSON.stringify({ whaleThreshold: 1e20 }))).status, 400);
+  assert.equal((await patch(JSON.stringify({ __proto__: { admin: true }, revision: 99 }))).status, 400);
+  assert.equal((await patch('x'.repeat(20 * 1024))).status, 413);
+  const valid = await patch(JSON.stringify({ httpUrl: 'https://rpc.example/path', wsUrl: 'wss://rpc.example/ws' }));
+  assert.equal(valid.status, 200);
+  assert.equal((await fetch(`${base}/api/state`, { method: 'DELETE' })).headers.get('allow'), 'GET, HEAD, PATCH, PUT');
 });
