@@ -204,6 +204,9 @@ function hasMapHeaderFrame(png) {
 }
 
 export function hasCharacterSelectionFrame(png) {
+  // Cielo blu e costumi viola imitano le due fasce del roster: barre HP e timer insieme
+  // esistono solo in combattimento, dove i tasti del roster finirebbero nella partita.
+  if (hasCombatHudFrame(png) && hasActiveCombatFrame(png)) return false;
   let blue = 0;
   let magenta = 0;
   for (let y = Math.floor(png.height * 0.06); y < Math.ceil(png.height * 0.19); y += 4) {

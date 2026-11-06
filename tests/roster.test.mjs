@@ -316,3 +316,22 @@ test('il percorso roster attende ogni stato visivo e non usa le lunghe attese fi
   }
   assert.equal(waits.some((ms) => ms > 2_500), false, `attese fisse residue: ${waits.join(', ')}`);
 });
+
+test('cielo blu e costumi viola a partita in corso non sono il Character Select', async () => {
+  const { hasCharacterSelectionFrame } = await import('../menuDriver.mjs');
+  const png = new PNG({ width: 960, height: 540 });
+  const paint = (x0, y0, x1, y1, [red, green, blue]) => {
+    for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
+      const offset = (y * png.width + x) * 4;
+      png.data[offset] = red; png.data[offset + 1] = green; png.data[offset + 2] = blue; png.data[offset + 3] = 255;
+    }
+  };
+  paint(0, 0, 960, 540, [120, 90, 70]);
+  paint(120, 35, 840, 105, [20, 70, 190]);
+  paint(120, 440, 840, 520, [170, 25, 100]);
+  assert.equal(hasCharacterSelectionFrame(png), true, 'senza HUD di combattimento resta il roster');
+  paint(164, 30, 412, 50, [40, 210, 55]);
+  paint(548, 30, 796, 50, [40, 210, 55]);
+  paint(460, 20, 500, 45, [240, 240, 240]);
+  assert.equal(hasCharacterSelectionFrame(png), false, 'barre HP e timer significano combattimento');
+});
