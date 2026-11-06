@@ -151,3 +151,146 @@ test('PumpPortal: market cap da DexScreener anche senza trade ed errori del serv
   assert.ok(statuses.some((status) => status.state === 'degraded' && /API key required/.test(status.detail)));
   feed.stop();
 });
+
+function fakeSocketClass() {
+  const sockets = [];
+  class FakeSocket {
+    constructor(url) { this.url = url; this.listeners = {}; this.sent = []; sockets.push(this); }
+    addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
+    send(message) { this.sent.push(message); }
+    close() {}
+    emit(type, event) { (this.listeners[type] ?? []).forEach((fn) => fn(event)); }
+  }
+  return { FakeSocket, sockets };
+}
+
+const PUMP_CA = 'FUvoZUa1FJa5bRRn4VYovJEMypYrWzpX4CdUK4DHpump';
+const flush = async () => { for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+const dexResponse = () => ({ ok: true, json: async () => ({ pairs: [{ chainId: 'solana', priceUsd: '150', marketCap: 1_000_000, liquidity: { usd: 1 } }] }) });
+
+test('PumpPortal: se il prezzo SOL non arriva al lancio il feed riprova da solo', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const { FakeSocket, sockets } = fakeSocketClass();
+  const statuses = [];
+  let online = false;
+  const feed = new MarketFeed({
+    WebSocketImpl: FakeSocket,
+    onStatus: (status) => statuses.push(status),
+    fetchImpl: async () => { if (!online) throw new TypeError('fetch failed'); return dexResponse(); },
+  });
+  t.after(() => feed.stop());
+  // Il CA appena salvato non deve restare senza feed per un errore di rete di un attimo.
+  await feed.connect('pumpportal', PUMP_CA);
+  assert.equal(feed.contractAddress, PUMP_CA);
+  assert.ok(statuses.some((status) => status.state === 'degraded'), 'errore visibile');
+  assert.equal(sockets.length, 0);
+  online = true;
+  t.mock.timers.tick(1_000);
+  await flush();
+  assert.equal(sockets.length, 1, 'dopo il ritorno della rete il WebSocket viene aperto');
+});
+
+test('PumpPortal: una riconnessione fallita viene ritentata, non abbandonata', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const { FakeSocket, sockets } = fakeSocketClass();
+  let online = true;
+  const feed = new MarketFeed({
+    WebSocketImpl: FakeSocket,
+    fetchImpl: async () => { if (!online) throw new TypeError('fetch failed'); return dexResponse(); },
+  });
+  t.after(() => feed.stop());
+  await feed.connect('pumpportal', PUMP_CA);
+  assert.equal(sockets.length, 1);
+  online = false;
+  sockets[0].emit('close');
+  t.mock.timers.tick(1_000);
+  await flush();
+  online = true;
+  t.mock.timers.tick(2_000);
+  await flush();
+  assert.equal(sockets.length, 2, 'il secondo tentativo riapre il WebSocket');
+});
+
+test('PumpPortal: le riconnessioni non accumulano timer del market cap', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const { FakeSocket, sockets } = fakeSocketClass();
+  let calls = 0;
+  const feed = new MarketFeed({
+    WebSocketImpl: FakeSocket,
+    fetchImpl: async () => { calls += 1; return dexResponse(); },
+  });
+  t.after(() => feed.stop());
+  await feed.connect('pumpportal', PUMP_CA, { solUsdPrice: 100, marketPollMs: 15_000 });
+  for (let drop = 0; drop < 3; drop += 1) {
+    sockets.at(-1).emit('close');
+    t.mock.timers.tick(14_000);
+    await flush();
+    sockets.at(-1).emit('open');
+  }
+  calls = 0;
+  t.mock.timers.tick(15_000);
+  await flush();
+  assert.equal(calls, 1, 'un solo aggiornamento ogni 15 s dopo tre riconnessioni');
+  feed.stop();
+  calls = 0;
+  t.mock.timers.tick(60_000);
+  await flush();
+  assert.equal(calls, 0, 'stop ferma tutti i timer');
+});
+
+test('dopo stop nessun messaggio del vecchio WebSocket raggiunge HUD o combattimento', async (t) => {
+  const { FakeSocket, sockets } = fakeSocketClass();
+  const trades = [];
+  const feed = new MarketFeed({ WebSocketImpl: FakeSocket, onTrade: (trade) => trades.push(trade), fetchImpl: async () => dexResponse() });
+  t.after(() => feed.stop());
+  await feed.connect('pumpportal', PUMP_CA, { solUsdPrice: 100, marketPollMs: 60_000 });
+  const old = sockets[0];
+  old.emit('open');
+  feed.stop();
+  old.emit('message', { data: JSON.stringify({ txType: 'buy', solAmount: 1, signature: 'x' }) });
+  await flush();
+  assert.deepEqual(trades, []);
+});
+
+test('un evento PumpPortal senza importo o con tipo ignoto non produce trade falsi', async (t) => {
+  const { FakeSocket, sockets } = fakeSocketClass();
+  const trades = [];
+  const statuses = [];
+  const feed = new MarketFeed({ WebSocketImpl: FakeSocket, onTrade: (trade) => trades.push(trade), onStatus: (status) => statuses.push(status), fetchImpl: async () => dexResponse() });
+  t.after(() => feed.stop());
+  await feed.connect('pumpportal', PUMP_CA, { solUsdPrice: 100, marketPollMs: 60_000 });
+  sockets[0].emit('open');
+  sockets[0].emit('message', { data: JSON.stringify({ txType: 'buy' }) });
+  sockets[0].emit('message', { data: JSON.stringify({ txType: 'create', solAmount: 1 }) });
+  sockets[0].emit('message', { data: 'non json' });
+  await flush();
+  assert.deepEqual(trades, []);
+  assert.ok(statuses.some((status) => status.state === 'degraded'), 'il dato sporco è segnalato');
+  sockets[0].emit('message', { data: JSON.stringify({ txType: 'sell', solAmount: 2, signature: 'ok' }) });
+  await flush();
+  assert.equal(trades.length, 1);
+  assert.equal(trades[0].side, 'SELL');
+  assert.equal(trades[0].amountUsd, 200);
+});
+
+test('Solana: lo scambio viene letto dal saldo del firmatario, senza prezzo nessun trade inventato', () => {
+  const feed = new MarketFeed({});
+  const transaction = {
+    blockTime: 1_800_000_000,
+    transaction: { message: { accountKeys: [{ pubkey: 'buyer', signer: true }] } },
+    meta: {
+      preTokenBalances: [{ mint: PUMP_CA, owner: 'buyer', uiTokenAmount: { uiAmountString: '10' } }],
+      postTokenBalances: [{ mint: PUMP_CA, owner: 'buyer', uiTokenAmount: { uiAmountString: '35' } }],
+    },
+  };
+  assert.equal(feed.normalizeSolanaTransaction(transaction, PUMP_CA, 'sig'), null, 'senza prezzo nessun importo');
+  feed.latestPrice = 2;
+  const event = feed.normalizeSolanaTransaction(transaction, PUMP_CA, 'sig');
+  assert.equal(event.side, 'BUY');
+  assert.equal(event.amountUsd, 50);
+  assert.equal(event.timestamp, 1_800_000_000_000);
+  const other = structuredClone(transaction);
+  other.meta.postTokenBalances = [{ mint: 'altro', owner: 'buyer', uiTokenAmount: { uiAmountString: '99' } }];
+  other.meta.preTokenBalances = [];
+  assert.equal(feed.normalizeSolanaTransaction(other, PUMP_CA, 'sig'), null, 'token diverso ignorato');
+});

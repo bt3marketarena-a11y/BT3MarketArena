@@ -172,7 +172,18 @@ export class MarketFeed {
   }
 
   async connectPumpPortal(ca, { solUsdPrice = null, marketPollMs = 15_000 } = {}, generation = this.connectionGeneration) {
-    const rate = solUsdPrice ?? await this.fetchSolUsdPrice();
+    let rate = solUsdPrice;
+    try {
+      rate ??= await this.fetchSolUsdPrice();
+    } catch (error) {
+      // Senza prezzo SOL il feed non parte: un errore di rete di un attimo, magari proprio
+      // al salvataggio del CA, non deve lasciarlo fermo fino al prossimo cambio.
+      if (this.isCurrentConnection(generation)) {
+        this.status('degraded', error.message);
+        this.scheduleReconnect(generation);
+      }
+      return;
+    }
     if (!this.isCurrentConnection(generation)) return;
     // I trade portano il market cap solo quando avvengono: prezzo e market cap arrivano
     // anche da DexScreener, così l'HUD resta aggiornato pure nei momenti senza scambi.
@@ -187,7 +198,11 @@ export class MarketFeed {
     };
     await refreshMarket();
     // Timer separato: this.timer è usato dalla riconnessione del WebSocket.
-    if (this.isCurrentConnection(generation)) this.marketTimer = setInterval(refreshMarket, Math.max(5_000, marketPollMs));
+    if (this.isCurrentConnection(generation)) {
+      // A ogni riconnessione questa funzione riparte: il timer precedente va sostituito.
+      clearInterval(this.marketTimer);
+      this.marketTimer = setInterval(refreshMarket, Math.max(5_000, marketPollMs));
+    }
     const url = 'wss://pumpportal.fun/api/data';
     this.openSocket(url, {
       onOpen: (socket) => socket.send(JSON.stringify({ method: 'subscribeTokenTrade', keys: [ca] })),

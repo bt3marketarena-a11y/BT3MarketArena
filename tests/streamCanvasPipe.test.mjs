@@ -6,9 +6,9 @@ import { AUDIO_TAP_SCRIPT, IN_PAGE_RECORDER, buildFfmpegArgs, chromiumArgs, find
 const PRIMARY = 'rtmp://a.rtmp.youtube.com/live2/primary-key';
 const SECONDARY = 'rtmps://va.pscp.tv:443/x/secondary-key';
 
-test('FFmpeg riceve soltanto lo stream della scheda da stdin, mai lo schermo', () => {
+test('FFmpeg riceve soltanto il flusso da stdin, mai lo schermo', () => {
   const joined = buildFfmpegArgs({ primary: PRIMARY }).join(' ');
-  assert.match(joined, /-f webm -i pipe:0/);
+  assert.match(joined, /-f mpegts -i pipe:0/);
   assert.equal(joined.match(/ -i /g).length, 1, 'un solo ingresso');
   assert.doesNotMatch(joined, /gdigrab|x11grab|dshow|ddagrab|desktop|lavfi/);
 });
@@ -68,21 +68,14 @@ test('in headless l audio arriva da WebAudio e la codifica può usare Quick Sync
 
 test('su portatili ibridi gioco e codifica usano la GPU NVIDIA con priorità bassa', async () => {
   const nvenc = buildFfmpegArgs({ primary: PRIMARY, encoder: 'h264_nvenc' }).join(' ');
-  assert.match(nvenc, /-hwaccel cuda -f webm -i pipe:0/);
+  assert.match(nvenc, /-hwaccel cuda .*-f mpegts -i pipe:0/);
   assert.match(nvenc, /-c:v h264_nvenc .*-rc cbr/);
   assert.doesNotMatch(buildFfmpegArgs({ primary: PRIMARY, encoder: 'h264_qsv' }).join(' '), /hwaccel/);
   const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
   assert.match(source, /'--force_high_performance_gpu'/);
   assert.match(source, /for \(const encoder of \['h264_nvenc', 'h264_qsv'\]\)/);
   assert.match(source, /PRIORITY_BELOW_NORMAL/);
-  assert.match(source, /lowerPriority\(ffmpeg\.pid, env\)/);
-});
-
-test('se i menu si bloccano prima del combattimento la sessione viene riaperta', async () => {
-  const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
-  assert.match(source, /state\?\.automationError && state\.menuSequence !== 'completed'/);
-  assert.match(source, /ffmpeg\.stdin\.end\(\);\s+setTimeout\(\(\) => ffmpeg\.kill\(\), 5_000\)/);
-  assert.match(source, /console\.error\('\[BT3 stream\] Sessione terminata: riavvio tra 10 secondi\.'\)/);
+  assert.match(source, /onMasterStart: \(pid\) => lowerPriority\(pid, env\)/);
 });
 
 test('la registrazione aspetta l AudioContext del gioco prima di partire', async () => {
@@ -91,11 +84,8 @@ test('la registrazione aspetta l AudioContext del gioco prima di partire', async
   assert.ok(wait > 0 && wait < source.indexOf('const recorder = await startTabRecorder(page);'));
 });
 
-test('una partita ferma nella stessa fase per oltre 10 minuti riapre la sessione', async () => {
+test('il watchdog legge fase e round dalla pagina', async () => {
   const source = await readFile(new URL('../scripts/stream-canvas-pipe.mjs', import.meta.url), 'utf8');
-  assert.match(source, /const stallMs = Number\(env\.STREAM_STALL_MS\) \|\| 10 \* 60_000/);
-  assert.match(source, /const menuStallMs = Number\(env\.STREAM_MENU_STALL_MS\) \|\| 3 \* 60_000/);
-  assert.match(source, /const limit = state\?\.phase === 'fighting' \? stallMs : menuStallMs/);
-  assert.match(source, /state\?\.menuSequence === 'completed' && Date\.now\(\) - lastChangeAt > limit/);
   assert.match(source, /round: window\.marketArena\?\.match\?\.round \?\? null/);
+  assert.match(source, /watchdog\.check\(await readDiagnostics\(page\)\.catch\(\(\) => null\), bytes\)/);
 });

@@ -155,7 +155,7 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
     waitForTimeout: async (ms) => {
       now += ms * 2;
       waits += 1;
-      if (waits >= 3) closed = true;
+      if (waits >= 4) closed = true;
     },
     keyboard: { down: () => {}, up: () => {} },
     evaluate: async (fn) => {
@@ -173,8 +173,8 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
   } finally {
     Date.now = originalNow;
   }
-  assert.deepEqual(notifyAt, [3]);
-  assert.deepEqual(inputLocksAt, [2, 3], 'il blocco deve precedere il menu finale e restare attivo sui risultati');
+  assert.deepEqual(notifyAt, [4], 'il KO arriva al secondo controllo con il menu finale');
+  assert.deepEqual(inputLocksAt, [2, 4], 'il blocco deve precedere il menu finale e restare attivo sui risultati');
 });
 
 test('un popup EXIT durante il combattimento chiude il match invece di bloccare la diretta', async () => {
@@ -190,10 +190,11 @@ test('un popup EXIT durante il combattimento chiude il match invece di bloccare 
   paint(440, 520, 270, 282, [220, 225, 230]);
   paint(440, 520, 302, 314, [230, 220, 40]);
   let closed = false;
+  let waits = 0;
   const evaluations = [];
   const page = {
     isClosed: () => closed,
-    waitForTimeout: async () => { closed = true; },
+    waitForTimeout: async () => { waits += 1; closed = waits >= 2; },
     keyboard: { down: () => {}, up: () => {} },
     evaluate: async (fn) => {
       evaluations.push(fn.toString());
@@ -203,6 +204,37 @@ test('un popup EXIT durante il combattimento chiude il match invece di bloccare 
   };
   await monitorPostMatch(page, { capture: async () => PNG.sync.write(png) });
   assert.equal(evaluations.some((source) => source.includes('notifyKO')), true);
+});
+
+test('un solo fotogramma che somiglia al menu finale non chiude il round', async () => {
+  const exitLike = new PNG({ width: 960, height: 540 });
+  const paint = (x0, x1, y0, y1, [red, green, blue]) => {
+    for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
+      const offset = (y * exitLike.width + x) * 4;
+      exitLike.data[offset] = red; exitLike.data[offset + 1] = green; exitLike.data[offset + 2] = blue; exitLike.data[offset + 3] = 255;
+    }
+  };
+  paint(0, 960, 0, 540, [35, 130, 55]);
+  paint(300, 660, 195, 340, [12, 35, 55]);
+  paint(440, 520, 270, 282, [220, 225, 230]);
+  paint(440, 520, 302, 314, [230, 220, 40]);
+  const combat = new PNG({ width: 960, height: 540 });
+  combat.data.fill(60);
+  let captures = 0;
+  let closed = false;
+  const evaluations = [];
+  const page = {
+    isClosed: () => closed,
+    waitForTimeout: async () => { closed = captures >= 3; },
+    keyboard: { down: () => {}, up: () => {} },
+    evaluate: async (fn) => {
+      evaluations.push(fn.toString());
+      if (fn.toString().includes('phase: window.marketArena')) return { phase: 'fighting', round: 1, durationMs: 0, features: { autoRematch: true, visualKO: true } };
+      return undefined;
+    },
+  };
+  await monitorPostMatch(page, { capture: async () => { captures += 1; return PNG.sync.write(captures === 1 ? exitLike : combat); } });
+  assert.equal(evaluations.some((source) => source.includes('notifyKO')), false);
 });
 
 test('il menu finale sopra le HP ancora visibili non conta come nuovo round', async () => {

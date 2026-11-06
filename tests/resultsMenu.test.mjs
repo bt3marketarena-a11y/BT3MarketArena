@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import {
+  hasExitPromptFrame,
   hasPauseMenuFrame,
   hasResultsMenuFrame,
   readExitPromptSelection,
@@ -403,5 +404,79 @@ test('con Character Select già evidenziato una conferma ignorata da P2 viene ri
     assert.equal(kPresses, 1, 'poi una conferma di P1, recepita');
   } finally {
     restore();
+  }
+});
+
+test('un fotogramma illeggibile durante lo spostamento non è un menu scomparso', async () => {
+  const events = [];
+  let unreadable = 2;
+  const blank = () => {
+    const png = new PNG({ width: 960, height: 540 });
+    paint(png, 0, 0, 960, 540, [35, 130, 55]);
+    return png;
+  };
+  const roster = () => {
+    const png = blank();
+    paint(png, 120, 35, 840, 105, [20, 70, 190]);
+    paint(png, 120, 440, 840, 520, [170, 25, 100]);
+    return png;
+  };
+  const { page, restore } = fakePage(async () => {
+    const released = (name) => events.some((event) => event.type === 'button' && event.args[1] === name && !event.args[2]);
+    if (released('cross')) return PNG.sync.write(roster());
+    if (!released('down')) return PNG.sync.write(resultsFrame(0));
+    // La voce lampeggia: subito dopo il tasto due letture non trovano nessuna riga gialla.
+    if (unreadable > 0) { unreadable -= 1; return PNG.sync.write(blank()); }
+    return PNG.sync.write(resultsFrame(1));
+  }, events);
+  try {
+    const plan = await runRematchSequence(page, { menuPlayer: 1, rosterSequence: async () => ({ verified: true }) });
+    assert.deepEqual(plan, { verified: true });
+    const buttons = events.filter((event) => event.type === 'button' && event.args[2]).map((event) => event.args[1]);
+    assert.deepEqual(buttons, ['down', 'cross'], 'un solo movimento e una sola conferma, nessun errore');
+  } finally {
+    restore();
+  }
+});
+
+test('se il menu non torna leggibile il driver si ferma senza confermare alla cieca', async () => {
+  const events = [];
+  const { page, restore } = fakePage(async () => {
+    const pressed = events.some((event) => event.type === 'button' || event.type === 'key');
+    if (!pressed) return PNG.sync.write(resultsFrame(0));
+    const png = new PNG({ width: 960, height: 540 });
+    paint(png, 0, 0, 960, 540, [35, 130, 55]);
+    return PNG.sync.write(png);
+  }, events);
+  try {
+    await assert.rejects(runRematchSequence(page, { menuPlayer: 1, rosterSequence: async () => ({}) }), /Nessun movimento del menu dalla voce 1; conferma bloccata/);
+    assert.equal(events.some((event) => event.type === 'button' && event.args[1] === 'cross'), false);
+    assert.equal(events.some((event) => event.type === 'key' && event.args[0] === 'k'), false);
+  } finally {
+    restore();
+  }
+});
+
+function yellowBuildingsFrame() {
+  // Stage reale con palazzi gialli e terreno scuro: combattimento in corso, nessun pannello.
+  const png = new PNG({ width: 960, height: 540 });
+  paint(png, 0, 0, 960, 540, [30, 40, 60]);
+  paint(png, 200, 120, 330, 400, [190, 160, 60]);
+  paint(png, 640, 120, 750, 400, [190, 160, 60]);
+  paint(png, 400, 240, 420, 260, [230, 230, 230]);
+  return png;
+}
+
+test('i palazzi gialli dello stage non vengono scambiati per il pannello EXIT', () => {
+  const frame = yellowBuildingsFrame();
+  assert.equal(hasExitPromptFrame(frame), false);
+  assert.equal(readExitPromptSelection(frame), null);
+});
+
+test('se EXIT è riconosciuto la voce è sempre leggibile: niente ciclo di errori', () => {
+  for (const selected of [0, 1]) {
+    const frame = exitFrame(selected);
+    assert.equal(hasExitPromptFrame(frame), true);
+    assert.equal(readExitPromptSelection(frame), selected);
   }
 });

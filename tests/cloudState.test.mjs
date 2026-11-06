@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { CloudStateStore } from '../cloudState.mjs';
 
 const VALID_CA = 'So11111111111111111111111111111111111111112';
 
 async function temporaryState(t) {
+  // artifacts/ è ignorata da git: su una copia pulita non esiste ancora.
+  await mkdir(path.join(process.cwd(), 'artifacts'), { recursive: true });
   const directory = await mkdtemp(path.join(process.cwd(), 'artifacts', 'test-state-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return path.join(directory, 'state.json');

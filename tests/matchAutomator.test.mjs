@@ -100,3 +100,29 @@ test('WasmMemoryBridge legge fase e HP dagli offset configurati', () => {
   });
   assert.deepEqual(bridge.read(), { phase: 2, hp1: 750, hp2: 500 });
 });
+
+test('un KO ripetuto dallo stesso round non conta due volte', async () => {
+  const phases = [];
+  const automator = new MatchAutomator({ koDelayMs: 1, onPhase: (phase, round) => phases.push(`${phase}/${round}`) });
+  automator.start();
+  assert.equal(automator.notifyKO(null, 'visual-results-menu'), true);
+  assert.equal(automator.notifyKO(null, 'visual-results-menu'), false, 'il secondo avviso è ignorato');
+  await wait(10);
+  assert.equal(automator.notifyKO(null, 'visual-results-menu'), false, 'anche in postmatch');
+  assert.deepEqual(phases, ['fighting/1', 'ko/1', 'postmatch/1']);
+  automator.stop();
+});
+
+test('ogni nuovo match aumenta il round di uno solo', async () => {
+  const automator = new MatchAutomator({ koDelayMs: 1 });
+  automator.start();
+  for (const expected of [2, 3, 4]) {
+    automator.notifyKO(null);
+    await wait(5);
+    assert.equal(automator.phase, 'postmatch');
+    automator.restart();
+    assert.equal(automator.round, expected);
+    assert.equal(automator.phase, 'fighting');
+  }
+  automator.stop();
+});

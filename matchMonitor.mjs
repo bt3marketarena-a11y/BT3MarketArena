@@ -14,6 +14,9 @@ export async function monitorPostMatch(page, {
   // loop. Serve la pausa in due controlli consecutivi e 3 s dall'ultima ripresa.
   let pauseStreak = 0;
   let lastResumeAt = -Infinity;
+  // Il menu finale resta a schermo: chiudere il round richiede due controlli di fila,
+  // così un fotogramma ambiguo non può dichiarare un KO a partita in corso.
+  let resultsStreak = 0;
   const endDetector = new CombatEndDetector({ delayMs: 12_000 });
   const koDetector = new KnockoutDetector({ delayMs: 1_500 });
   while (!isClosed()) {
@@ -32,6 +35,7 @@ export async function monitorPostMatch(page, {
         endDetector.reset();
         koDetector.reset();
         koPending = false;
+        resultsStreak = 0;
       }
       if (phase === 'fighting') {
         const png = PNG.sync.read(await capture(page));
@@ -49,6 +53,11 @@ export async function monitorPostMatch(page, {
             resultsMenuVisible, koPending: knockoutPending,
           };
         }, { activeCombat, health, pauseMenuVisible: pauseMenu, resultsMenuVisible: resultsMenu, knockoutPending: koPending, phase, round: state.round });
+        resultsStreak = resultsMenu ? resultsStreak + 1 : 0;
+        if (resultsMenu && resultsStreak < 2) {
+          await page.waitForTimeout(250);
+          continue;
+        }
         if (resultsMenu) {
           console.log('[BT3 round] menu finale a sei voci rilevato: KO confermato dal gioco');
           endDetector.reset();

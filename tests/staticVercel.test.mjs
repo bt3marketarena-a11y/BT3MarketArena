@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { buildStaticVercel } from '../scripts/build-static-vercel.mjs';
 
 async function workspace(t) {
+  // artifacts/ è ignorata da git: su una copia pulita non esiste ancora.
+  await mkdir(path.join(process.cwd(), 'artifacts'), { recursive: true });
   const directory = await mkdtemp(path.join(process.cwd(), 'artifacts', 'static-vercel-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;

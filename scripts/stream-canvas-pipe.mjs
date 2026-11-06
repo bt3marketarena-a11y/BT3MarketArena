@@ -4,15 +4,75 @@
 // stdin. Desktop, altre finestre e altri monitor non sono raggiungibili da questa
 // pipeline. Gli URL RTMP contengono la stream key: non vengono mai stampati.
 import { chromium } from 'playwright';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
-import { existsSync, readdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BACKGROUND_FLAGS, findChromeExecutable } from '../launcher.mjs';
+import { ContinuousOutput } from './streamOutput.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_GAME_URL = 'https://bt-3-market-arena.vercel.app/runtime.html?hud=0&embedded=0&lang=it&env=BT3_SCALE%3D1%2CBT3_INTERP%3D0';
+const STANDBY_IMAGE = path.join(ROOT, 'templates', 'assets', 'cover.png');
+
+/** Toglie qualsiasi URL di destinazione: contiene la stream key. */
+export function redactStreamUrls(text) {
+  return String(text).replace(/rtmps?:\/\/\S+/gi, '[destinazione nascosta]');
+}
+
+// Copia su file i messaggi della console: senza, a diretta chiusa non resta nessuna prova
+// di ciò che è successo. artifacts/ è ignorata da git e il testo passa dal filtro.
+function logToFile(file) {
+  if (!file) return;
+  mkdirSync(path.dirname(file), { recursive: true });
+  for (const method of ['log', 'error']) {
+    const original = console[method].bind(console);
+    console[method] = (...args) => {
+      const line = redactStreamUrls(args.join(' '));
+      original(line);
+      try { appendFileSync(file, `${new Date().toISOString()} ${line}\n`); } catch {}
+    };
+  }
+}
+
+/**
+ * Decide se la sessione va riaperta. Copre anche i casi in cui la pagina non risponde più:
+ * senza stato non si può sapere se il gioco è vivo, e senza nuovi dati dalla scheda la
+ * diretta è ferma anche se la pagina sembra a posto.
+ */
+export class SessionWatchdog {
+  constructor({ stallMs = 10 * 60_000, menuStallMs = 3 * 60_000, bootMs = 10 * 60_000, deadPageMs = 45_000, noDataMs = 45_000, now = Date.now } = {}) {
+    Object.assign(this, { stallMs, menuStallMs, bootMs, deadPageMs, noDataMs, now });
+    const start = now();
+    this.startedAt = start;
+    this.signature = '';
+    this.lastChangeAt = start;
+    this.lastStateAt = start;
+    this.lastBytes = 0;
+    this.lastDataAt = start;
+  }
+
+  check(state, bytes) {
+    const at = this.now();
+    if (bytes !== this.lastBytes) { this.lastBytes = bytes; this.lastDataAt = at; }
+    if (at - this.lastDataAt > this.noDataMs) return `nessun dato dalla scheda da oltre ${Math.round(this.noDataMs / 1000)} secondi`;
+    if (!state) {
+      return at - this.lastStateAt > this.deadPageMs ? `pagina senza risposta da oltre ${Math.round(this.deadPageMs / 1000)} secondi` : null;
+    }
+    this.lastStateAt = at;
+    if (state.automationError && state.menuSequence !== 'completed') {
+      return `menu bloccati prima del combattimento (${String(state.automationError).split('\n')[0]})`;
+    }
+    const signature = `${state.phase}/${state.round}`;
+    if (signature !== this.signature) { this.signature = signature; this.lastChangeAt = at; return null; }
+    if (state.menuSequence !== 'completed') {
+      return at - this.startedAt > this.bootMs ? `menu iniziali non completati in ${Math.round(this.bootMs / 60_000)} minuti` : null;
+    }
+    const limit = state.phase === 'fighting' ? this.stallMs : this.menuStallMs;
+    return at - this.lastChangeAt > limit ? `partita ferma su ${signature} da oltre ${Math.round(limit / 60_000)} minuti` : null;
+  }
+}
 
 export function chromiumArgs({ windowPosition = '-2400,0' } = {}) {
   return [
@@ -34,13 +94,15 @@ export function buildFfmpegArgs({ primary, secondary = '', durationSec = 0, vide
     : [...(fileFormat(primary) === 'mp4' ? ['-movflags', '+faststart'] : []), '-f', fileFormat(primary), primary];
   return [
     '-hide_banner', '-loglevel', 'warning', '-y',
-    // Unico ingresso: il WebM prodotto da MediaRecorder dentro la pagina.
-    // Con NVENC anche la decodifica del WebM resta sulla GPU NVIDIA.
+    // Unico ingresso: MPEG-TS da stdin, cioè la sola scheda oppure la schermata d'attesa
+    // (vedi streamOutput.mjs). Con NVENC anche la decodifica resta sulla GPU NVIDIA.
     ...(encoder === 'h264_nvenc' ? ['-hwaccel', 'cuda'] : []),
-    '-f', 'webm', '-i', 'pipe:0',
+    '-fflags', '+genpts+discardcorrupt', '-f', 'mpegts', '-i', 'pipe:0',
     '-map', '0:v:0', '-map', '0:a:0?',
     ...(durationSec > 0 ? ['-t', String(durationSec)] : []),
     '-vf', 'scale=1920:1080:flags=bicubic,fps=60',
+    // Il cambio di sorgente può lasciare un attimo senza audio: si riempie di silenzio.
+    '-af', 'aresample=async=1000',
     // NVENC usa la GPU dedicata e lascia libera la Intel che disegna il desktop; Quick Sync
     // resta il ripiego senza NVIDIA. Con libx264 la CPU condivisa rallentava il gioco.
     ...({
@@ -163,17 +225,28 @@ async function readDiagnostics(page) {
   }));
 }
 
-export async function runSession(env = process.env) {
-  const durationSec = Number(env.STREAM_DURATION_SEC) || 0;
+export function createOutput(env = process.env) {
   const ffmpegPath = findFfmpeg(env);
   const encoder = pickEncoder(ffmpegPath, env.STREAM_VIDEO_ENCODER);
-  const ffmpegArgs = buildFfmpegArgs({
-    primary: env.STREAM_RTMP_URL,
-    secondary: env.STREAM_RTMP_URL_SECONDARY,
-    durationSec,
-    videoBitrate: env.STREAM_VIDEO_BITRATE || '6000k',
-    encoder,
+  const output = new ContinuousOutput({
+    ffmpegPath,
+    fillerImage: STANDBY_IMAGE,
+    masterArgs: buildFfmpegArgs({
+      primary: env.STREAM_RTMP_URL,
+      secondary: env.STREAM_RTMP_URL_SECONDARY,
+      durationSec: Number(env.STREAM_DURATION_SEC) || 0,
+      videoBitrate: env.STREAM_VIDEO_BITRATE || '6000k',
+      encoder,
+    }),
+    filterLog: redactStreamUrls,
+    onMasterStart: (pid) => lowerPriority(pid, env),
   });
+  console.log(`[BT3 stream] encoder video: ${encoder}`);
+  return output;
+}
+
+export async function runSession(env = process.env, output = createOutput(env)) {
+  const durationSec = Number(env.STREAM_DURATION_SEC) || 0;
   const executablePath = findChromeExecutable();
   // Headless: nessuna finestra sul desktop e superficie esattamente 1920x1080. Una finestra
   // reale viene ridotta da Windows all'area dello schermo (con scaling 125% ~1920x795 CSS)
@@ -191,7 +264,7 @@ export async function runSession(env = process.env) {
         '--force_high_performance_gpu'] : []),
     ],
   });
-  let ffmpeg = null;
+  let session = null;
   try {
     // viewport null: la pagina usa la superficie reale, la stessa che riceve la cattura.
     const page = await browser.newPage(headless ? { viewport: null } : { viewport: { width: 1920, height: 1080 } });
@@ -216,21 +289,28 @@ export async function runSession(env = process.env) {
       console.log(`[BT3 stream] combattimento raggiunto: ${JSON.stringify(ready)}`);
     }
 
-    console.log(`[BT3 stream] encoder video: ${encoder}`);
-    ffmpeg = spawn(ffmpegPath, ffmpegArgs, { cwd: ROOT, stdio: ['pipe', 'inherit', 'inherit'] });
-    lowerPriority(ffmpeg.pid, env);
-    const ffmpegDone = new Promise((resolve) => ffmpeg.on('exit', (code) => resolve(code ?? 1)));
-    // A fine registrazione FFmpeg chiude stdin mentre la pagina può ancora inviare chunk.
-    ffmpeg.stdin.on('error', () => {});
+    // Il principale resta collegato fra una sessione e l'altra: se è già vivo, qui in onda
+    // c'è la schermata d'attesa e lascia il posto al gioco col primo dato della scheda.
+    const outputDone = output.start();
+    const copyVideo = await page.evaluate(() => MediaRecorder.isTypeSupported('video/webm;codecs=h264,opus'));
+    session = output.openSession({ copyVideo });
     let bytes = 0;
     await page.exposeBinding('__bt3StreamChunk', async (_source, base64) => {
-      if (!ffmpeg.stdin.writable) return;
+      if (!session.writable) return;
       const chunk = Buffer.from(base64, 'base64');
       bytes += chunk.length;
-      if (!ffmpeg.stdin.write(chunk)) await new Promise((resolve) => ffmpeg.stdin.once('drain', resolve));
+      if (!session.write(chunk)) await new Promise((resolve) => session.once('drain', resolve));
     });
     let ended = null;
-    await page.exposeBinding('__bt3StreamEnded', (_source, reason) => { ended = reason; ffmpeg.stdin.end(); });
+    let endSession;
+    const sessionEnded = new Promise((resolve) => { endSession = resolve; });
+    const finish = (reason) => {
+      if (ended) return;
+      ended = reason;
+      endSession();
+    };
+    await page.exposeBinding('__bt3StreamEnded', (_source, reason) => finish(reason));
+    page.on('crash', () => finish('pagina del gioco terminata'));
     // In headless l'audio della scheda è muto: la registrazione parte quando il gioco ha
     // creato il suo AudioContext, così la sorgente è il tap WebAudio e non il silenzio.
     await page.waitForFunction(() => window.__BT3_AUDIO_TAPS__?.size > 0, null, { timeout: Number(env.STREAM_AUDIO_WAIT_MS) || 90_000 })
@@ -248,37 +328,25 @@ export async function runSession(env = process.env) {
     // Rete di sicurezza 24/7: un match dura al massimo ~5 minuti, quindi la stessa fase e
     // lo stesso round per oltre STREAM_STALL_MS indicano un blocco (menu non riconosciuto,
     // popup inatteso): si riapre il gioco invece di restare fermi in diretta.
-    const stallMs = Number(env.STREAM_STALL_MS) || 10 * 60_000;
-    // Fuori dal combattimento (menu, KO, post-partita) 3 minuti fermi sono già un blocco certo.
-    const menuStallMs = Number(env.STREAM_MENU_STALL_MS) || 3 * 60_000;
-    let lastSignature = '';
-    let lastChangeAt = Date.now();
-    const restartSession = (reason) => {
-      if (ended || ffmpeg.exitCode !== null) return;
-      console.error(`[BT3 stream] ${reason}: riavvio della sessione.`);
-      ended = reason;
-      ffmpeg.stdin.end();
-      setTimeout(() => ffmpeg.kill(), 5_000);
-    };
-    const watchdog = setInterval(async () => {
-      const state = await readDiagnostics(page).catch(() => null);
-      if (state?.automationError && state.menuSequence !== 'completed') {
-        restartSession(`menu bloccati prima del combattimento (${String(state.automationError).split('\n')[0]})`);
-        return;
-      }
-      const signature = `${state?.phase}/${state?.round}`;
-      if (signature !== lastSignature) { lastSignature = signature; lastChangeAt = Date.now(); return; }
-      const limit = state?.phase === 'fighting' ? stallMs : menuStallMs;
-      if (state?.menuSequence === 'completed' && Date.now() - lastChangeAt > limit) {
-        restartSession(`partita ferma su ${signature} da oltre ${Math.round(limit / 60_000)} minuti`);
+    const watchdog = new SessionWatchdog({
+      stallMs: Number(env.STREAM_STALL_MS) || undefined,
+      // Fuori dal combattimento (menu, KO, post-partita) 3 minuti fermi sono già un blocco certo.
+      menuStallMs: Number(env.STREAM_MENU_STALL_MS) || undefined,
+    });
+    const watchdogTimer = setInterval(async () => {
+      const reason = watchdog.check(await readDiagnostics(page).catch(() => null), bytes);
+      if (reason && !ended) {
+        console.error(`[BT3 stream] ${reason}: riavvio della sessione.`);
+        finish(reason);
       }
     }, Number(env.STREAM_WATCHDOG_MS) || 10_000);
-    const code = await ffmpegDone.finally(() => clearInterval(watchdog));
+    const code = await Promise.race([outputDone, sessionEnded.then(() => 0)]).finally(() => clearInterval(watchdogTimer));
     const diagnostics = await readDiagnostics(page).catch(() => null);
-    console.log(`[BT3 stream] FFmpeg terminato (${code}), ${bytes} byte dalla scheda${ended ? `, ${ended}` : ''}: ${JSON.stringify(diagnostics)}`);
+    console.log(`[BT3 stream] sessione chiusa (${code}), ${bytes} byte dalla scheda, diretta ${output.connected ? 'ancora collegata' : 'scollegata'}${ended ? `, ${ended}` : ''}: ${JSON.stringify(diagnostics)}`);
     return { code, recorder, diagnostics, bytes };
   } finally {
-    ffmpeg?.stdin.destroy();
+    // Prima la schermata d'attesa, poi la chiusura del browser: niente buchi in onda.
+    await session?.close({ standby: durationSec === 0 });
     await browser.close().catch(() => {});
   }
 }
@@ -292,20 +360,24 @@ function lowerPriority(pid = 0, env = process.env) {
 
 async function main() {
   lowerPriority();
+  logToFile(process.env.STREAM_LOG_FILE ?? path.join(ROOT, 'artifacts', 'stream-live.log'));
   let stopping = false;
   process.on('SIGINT', () => { stopping = true; process.exit(0); });
   process.on('SIGTERM', () => { stopping = true; process.exit(0); });
   const once = Number(process.env.STREAM_DURATION_SEC) > 0;
+  let output = null;
   while (!stopping) {
     try {
-      const { code } = await runSession();
-      if (once) { process.exitCode = code; return; }
-      console.error('[BT3 stream] Sessione terminata: riavvio tra 10 secondi.');
+      output ??= createOutput();
+      const { code } = await runSession(process.env, output);
+      if (once) { await output.stop(); process.exitCode = code; return; }
+      console.error(`[BT3 stream] Sessione terminata: riapro il gioco${output.connected ? ', la diretta resta collegata' : ' tra 10 secondi'}.`);
     } catch (error) {
-      console.error(`[BT3 stream] ${error.message}`);
-      if (once) { process.exitCode = 1; return; }
+      console.error(`[BT3 stream] ${redactStreamUrls(error.message)}`);
+      if (once) { await output?.stop(); process.exitCode = 1; return; }
     }
-    await new Promise((resolve) => setTimeout(resolve, 10_000));
+    // Con la schermata d'attesa in onda conviene riaprire subito.
+    await new Promise((resolve) => setTimeout(resolve, output?.connected ? 2_000 : 10_000));
   }
 }
 

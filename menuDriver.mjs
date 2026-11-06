@@ -356,8 +356,10 @@ export function hasExitPromptFrame(png) {
   const { darkRatio, brightText } = pausePanelStats(png);
   const center = darkPanelRatio(png, 0.3, 0.7, 0.34, 0.65);
   // Il personaggio alle spalle può scurire i lati: Yes/No evidenziati e il
-  // pannello centrale identificano EXIT senza dipendere dallo sfondo.
-  const yesNoSelection = yellowTextCount(png, 280) > 20 || yellowTextCount(png, 311) > 20;
+  // pannello centrale identificano EXIT senza dipendere dallo sfondo. Il giallo si cerca
+  // solo dove stanno Yes e No: i palazzi gialli di alcuni stage facevano scattare un falso
+  // KO a partita in corso (round doppio, o blocco su "Pannello EXIT non leggibile").
+  const yesNoSelection = yellowTextCount(png, 280, 0.44, 0.56) > 20 || yellowTextCount(png, 311, 0.44, 0.56) > 20;
   return !hasResultsMenuFrame(png) && darkRatio > 0.2 && brightText > 24 && center > 0.4 && yesNoSelection;
 }
 
