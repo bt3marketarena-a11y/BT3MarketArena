@@ -207,6 +207,9 @@ export function hasCharacterSelectionFrame(png) {
   // Cielo blu e costumi viola imitano le due fasce del roster: barre HP e timer insieme
   // esistono solo in combattimento, dove i tasti del roster finirebbero nella partita.
   if (hasCombatHudFrame(png) && hasActiveCombatFrame(png)) return false;
+  // Lo stesso vale per i pannelli sopra uno sfondo così: scambiarli per il roster fa saltare
+  // il menu risultati e porta i tasti del roster su Return to Main Menu.
+  if (hasResultsMenuFrame(png) || hasExitPromptFrame(png) || hasPauseMenuFrame(png)) return false;
   let blue = 0;
   let magenta = 0;
   for (let y = Math.floor(png.height * 0.06); y < Math.ceil(png.height * 0.19); y += 4) {

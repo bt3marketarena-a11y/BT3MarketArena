@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import {
+  hasCharacterSelectionFrame,
   hasExitPromptFrame,
   hasPauseMenuFrame,
   hasResultsMenuFrame,
@@ -479,4 +480,19 @@ test('se EXIT è riconosciuto la voce è sempre leggibile: niente ciclo di error
     assert.equal(hasExitPromptFrame(frame), true);
     assert.equal(readExitPromptSelection(frame), selected);
   }
+});
+
+test('un pannello su sfondo azzurro con costumi viola non è il Character Select', () => {
+  // Sfondo reale: cielo in alto e braccia viola in basso imitano le due fasce del roster.
+  const decorate = (png) => {
+    paint(png, 120, 35, 840, 105, [20, 70, 190]);
+    paint(png, 120, 440, 840, 520, [170, 25, 100]);
+    return png;
+  };
+  const exit = decorate(exitFrame(1));
+  assert.equal(hasExitPromptFrame(exit), true);
+  assert.equal(hasCharacterSelectionFrame(exit), false);
+  const results = decorate(resultsFrame(0));
+  assert.equal(hasResultsMenuFrame(results), true);
+  assert.equal(hasCharacterSelectionFrame(results), false);
 });
