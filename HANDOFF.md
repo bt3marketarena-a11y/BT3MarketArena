@@ -99,7 +99,9 @@ Il proxy non inoltra `ADMIN_KEY` all'upstream. Le risposte HTML eliminano CSP/en
 
 ## Falso KO sugli stage gialli
 
-`hasExitPromptFrame()` cercava il giallo di Yes/No sul 60% della larghezza: i palazzi gialli su terreno scuro sembravano una voce evidenziata e, in fase `fighting`, dichiaravano un KO a partita in corso. Prima di 7199b1b il recovery contava un round in più (round di pochi secondi); dopo, il monitor restava fermo su "Pannello EXIT non leggibile" fino al watchdog. Ora il giallo si cerca nella stessa fascia centrale (44–56%) usata per leggere la voce, e `monitorPostMatch()` richiede due controlli di fila prima di chiudere il round. Il timer non è un criterio valido: esistono veri pannelli EXIT con il timer ancora visibile.
+`hasExitPromptFrame()` cercava il giallo di Yes/No sul 60% della larghezza: i palazzi gialli su terreno scuro sembravano una voce evidenziata e, in fase `fighting`, dichiaravano un KO a partita in corso. Prima di 7199b1b il recovery contava un round in più (round di pochi secondi); dopo, il monitor restava fermo su "Pannello EXIT non leggibile" fino al watchdog. Ora il giallo si cerca nella stessa fascia centrale (44–56%) usata per leggere la voce, e `monitorPostMatch()` richiede circa 2 s di controlli di fila prima di chiudere il round, sospendendo subito i pad: l'introduzione del match fa sfarfallare i rilevatori. Il timer non è un criterio valido: esistono veri pannelli EXIT con il timer ancora visibile.
+
+`hasCharacterSelectionFrame()` esclude barre HP con timer e i pannelli risultati, EXIT e pausa: cielo azzurro e costumi viola imitano le due fasce del roster, e il driver mandava i tasti del roster sul menu risultati fino a "Return to Main Menu". `confirmP2Ready()` tollera i ritratti viola che imitano Select Color di P2.
 
 ## Input
 

@@ -335,3 +335,26 @@ test('cielo blu e costumi viola a partita in corso non sono il Character Select'
   paint(460, 20, 500, 45, [240, 240, 240]);
   assert.equal(hasCharacterSelectionFrame(png), false, 'barre HP e timer significano combattimento');
 });
+
+test('un ritratto che somiglia a Select Color non blocca P2 già pronto', async () => {
+  const { confirmP2Ready } = await import('../menuDriver.mjs');
+  const portrait = rosterFrame();
+  addCustomSelect(portrait, 0);
+  addSelectColor(portrait, 1);
+  const presses = [];
+  const page = { screenshot: async () => PNG.sync.write(portrait), waitForTimeout: async () => {} };
+  const originalNow = Date.now;
+  let now = 0;
+  Date.now = () => { now += 1_000; return now; };
+  try {
+    await confirmP2Ready(page, { padTap: async (button) => { presses.push(button); }, progress: () => {} });
+    assert.deepEqual(presses, ['cross', 'cross', 'cross'], 'le conferme previste, poi si prosegue con P1');
+    const stuck = rosterFrame();
+    addCustomSelect(stuck, 1);
+    addSelectColor(stuck, 1);
+    page.screenshot = async () => PNG.sync.write(stuck);
+    await assert.rejects(confirmP2Ready(page, { padTap: async () => {}, progress: () => {} }), /P2 pronto non verificato/, 'senza il pannello di P1 resta un errore');
+  } finally {
+    Date.now = originalNow;
+  }
+});

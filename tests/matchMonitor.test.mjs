@@ -155,7 +155,7 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
     waitForTimeout: async (ms) => {
       now += ms * 2;
       waits += 1;
-      if (waits >= 4) closed = true;
+      if (waits >= 7) closed = true;
     },
     keyboard: { down: () => {}, up: () => {} },
     evaluate: async (fn) => {
@@ -173,8 +173,8 @@ test('una HP assente sospende i pad ma il KO attende il menu finale a sei voci',
   } finally {
     Date.now = originalNow;
   }
-  assert.deepEqual(notifyAt, [4], 'il KO arriva al secondo controllo con il menu finale');
-  assert.deepEqual(inputLocksAt, [2, 4], 'il blocco deve precedere il menu finale e restare attivo sui risultati');
+  assert.deepEqual(notifyAt, [7], 'il KO arriva dopo cinque controlli di fila con il menu finale');
+  assert.deepEqual(inputLocksAt, [2, 7], 'il blocco deve precedere il menu finale e restare attivo sui risultati');
 });
 
 test('un popup EXIT durante il combattimento chiude il match invece di bloccare la diretta', async () => {
@@ -194,7 +194,7 @@ test('un popup EXIT durante il combattimento chiude il match invece di bloccare 
   const evaluations = [];
   const page = {
     isClosed: () => closed,
-    waitForTimeout: async () => { waits += 1; closed = waits >= 2; },
+    waitForTimeout: async () => { waits += 1; closed = waits >= 5; },
     keyboard: { down: () => {}, up: () => {} },
     evaluate: async (fn) => {
       evaluations.push(fn.toString());
@@ -206,7 +206,7 @@ test('un popup EXIT durante il combattimento chiude il match invece di bloccare 
   assert.equal(evaluations.some((source) => source.includes('notifyKO')), true);
 });
 
-test('un solo fotogramma che somiglia al menu finale non chiude il round', async () => {
+test('una falsa somiglianza col menu finale per meno di 2 s non chiude il round', async () => {
   const exitLike = new PNG({ width: 960, height: 540 });
   const paint = (x0, x1, y0, y1, [red, green, blue]) => {
     for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) {
@@ -225,7 +225,7 @@ test('un solo fotogramma che somiglia al menu finale non chiude il round', async
   const evaluations = [];
   const page = {
     isClosed: () => closed,
-    waitForTimeout: async () => { closed = captures >= 3; },
+    waitForTimeout: async () => { closed = captures >= 6; },
     keyboard: { down: () => {}, up: () => {} },
     evaluate: async (fn) => {
       evaluations.push(fn.toString());
@@ -233,8 +233,9 @@ test('un solo fotogramma che somiglia al menu finale non chiude il round', async
       return undefined;
     },
   };
-  await monitorPostMatch(page, { capture: async () => { captures += 1; return PNG.sync.write(captures === 1 ? exitLike : combat); } });
+  await monitorPostMatch(page, { capture: async () => { captures += 1; return PNG.sync.write(captures <= 4 ? exitLike : combat); } });
   assert.equal(evaluations.some((source) => source.includes('notifyKO')), false);
+  assert.equal(evaluations.some((source) => source.includes('inputLocked = true')), true, 'nel dubbio i pad si fermano subito');
 });
 
 test('il menu finale sopra le HP ancora visibili non conta come nuovo round', async () => {

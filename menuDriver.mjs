@@ -619,6 +619,21 @@ async function confirmRosterState(page, action, predicate, label) {
   throw new Error(`${label}: conferma non verificata.`);
 }
 
+/**
+ * Chiude Select Color di P2. Alcuni ritratti, come quelli viola, imitano le sue righe anche a
+ * P2 già pronto: finite le conferme, pannello di P1 aperto e P2 chiuso bastano per proseguire.
+ * Se Select Color fosse vero, la conferma successiva di P1 fallirebbe con un errore visibile.
+ */
+export async function confirmP2Ready(page, { padTap, progress }) {
+  try {
+    await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1), 'P2 pronto');
+  } catch (error) {
+    const frame = PNG.sync.read(await page.screenshot());
+    if (!hasCustomSelectFrame(frame, 0) || hasCustomSelectFrame(frame, 1)) throw error;
+    progress('P2 pronto: ritratto simile a Select Color, proseguo con P1');
+  }
+}
+
 /** Seleziona davvero roster, costumi e mappa dal Character Select corrente. */
 export async function runRosterSequence(page, { random = Math.random, onProgress = () => {} } = {}) {
   const randomInt = (min, max) => min + Math.floor(random() * (max - min + 1));
@@ -648,9 +663,7 @@ export async function runRosterSequence(page, { random = Math.random, onProgress
       || (hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1)),
     'Normal P2',
   );
-  if (hasSelectColorFrame(p2NormalFrame, 1)) {
-    await confirmRosterState(page, () => padTap('cross', 400), (png) => hasCustomSelectFrame(png, 0) && !hasCustomSelectFrame(png, 1) && !hasSelectColorFrame(png, 1), 'P2 pronto');
-  }
+  if (hasSelectColorFrame(p2NormalFrame, 1)) await confirmP2Ready(page, { padTap, progress });
 
   progress('conferma Normal e colore di P1');
   const p1NormalFrame = await confirmRosterState(
