@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { buildWhipArgs, redactStreamUrls } from '../scripts/stream-canvas-pipe.mjs';
 import { ContinuousOutput } from '../scripts/streamOutput.mjs';
-import { startWhipProxy, stripIpv6Candidates } from '../scripts/whipProxy.mjs';
+import { keepUdpIpv4Candidates, startWhipProxy } from '../scripts/whipProxy.mjs';
 
-test('la risposta SDP perde solo i candidati IPv6', () => {
+test('la risposta SDP tiene solo i candidati UDP IPv4', () => {
   const sdp = [
     'v=0',
     'a=candidate:1 1 udp 2130706431 143.223.92.178 50001 typ host',
@@ -13,7 +13,8 @@ test('la risposta SDP perde solo i candidati IPv6', () => {
     'a=candidate:3 1 tcp 1671430143 2603:c026::1 7881 typ host tcptype passive',
     'a=ice-ufrag:abc',
   ].join('\r\n');
-  const clean = stripIpv6Candidates(sdp);
+  const clean = keepUdpIpv4Candidates(sdp);
+  assert.doesNotMatch(clean, / tcp /);
   assert.match(clean, /143\.223\.92\.178/);
   assert.doesNotMatch(clean, /2603:/);
   assert.match(clean, /a=ice-ufrag:abc/);
