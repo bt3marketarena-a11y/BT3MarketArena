@@ -1,7 +1,9 @@
 # Avvia lo streamer verso Kick. La stream key viene chiesta nascosta (asterischi),
 # resta solo in questa sessione e non finisce nella cronologia di PowerShell.
 param(
-  [string]$IngestUrl = 'rtmps://fa723fc1b171.global-contribute.live-video.net:443/app'
+  [string]$IngestUrl = 'rtmps://fa723fc1b171.global-contribute.live-video.net:443/app',
+  # Server URL di pump.fun (WHIP o RTMP): se indicato, la domanda sul server viene saltata.
+  [string]$PumpServer = ''
 )
 $ErrorActionPreference = 'Stop'
 Clear-Host
@@ -23,8 +25,13 @@ Remove-Item Env:\STREAM_RTMP_URL_SECONDARY, Env:\STREAM_WHIP_URL, Env:\STREAM_WH
 # pump.fun usa WHIP (https://...whip.livekit.cloud/...): un FFmpeg separato, se cade Kick continua.
 # Un server rtmp:// passa invece dal tee del principale (onfail=ignore).
 Write-Host ''
-Write-Host 'Trasmettere anche su pump.fun? Incolla il Server URL di pump.fun, oppure premi Invio per saltare.'
-$server = (Read-Host 'Server URL pump.fun').Trim()
+if ($PumpServer) {
+  $server = $PumpServer.Trim()
+  Write-Host 'Seconda destinazione: pump.fun.'
+} else {
+  Write-Host 'Trasmettere anche su pump.fun? Incolla il Server URL di pump.fun, oppure premi Invio per saltare.'
+  $server = (Read-Host 'Server URL pump.fun').Trim()
+}
 if ($server) {
   if ($server -notmatch '^(rtmps?|https)://') { throw 'Il Server URL deve iniziare con https://, rtmp:// o rtmps://' }
   $securePump = Read-Host -AsSecureString 'Stream key pump.fun'
