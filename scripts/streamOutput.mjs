@@ -52,9 +52,15 @@ export function createPacketAligner() {
 }
 
 export class ContinuousOutput {
-  constructor({ ffmpegPath, masterArgs, fillerImage, spawnImpl = spawn, now = Date.now, log = console.error, flushMs = 3_000, filterLog = (text) => text, onMasterStart = () => {} }) {
+  constructor({ ffmpegPath, masterArgs, mirrorArgs = null, mirrorRetryMs = 30_000, fillerImage, spawnImpl = spawn, now = Date.now, log = console.error, flushMs = 3_000, filterLog = (text) => text, onMasterStart = () => {} }) {
     this.ffmpegPath = ffmpegPath;
     this.masterArgs = masterArgs;
+    // Seconda destinazione facoltativa (es. pump.fun via WHIP) con un FFmpeg separato: riceve
+    // gli stessi pacchetti TS ma non rallenta né fa cadere il principale.
+    this.mirrorArgs = mirrorArgs;
+    this.mirrorRetryMs = mirrorRetryMs;
+    this.mirror = null;
+    this.mirrorTimer = null;
     this.fillerImage = fillerImage;
     this.spawn = spawnImpl;
     this.now = now;
@@ -90,9 +96,46 @@ export class ContinuousOutput {
     master.stdin.on('error', () => {});
     this.done = new Promise((resolve) => master.on('exit', (code) => {
       this.stopFiller();
+      this.stopMirror();
       resolve(code ?? 1);
     }));
+    this.startMirror();
     return this.done;
+  }
+
+  startMirror() {
+    if (!this.mirrorArgs || this.mirror || !this.connected) return;
+    const mirror = this.spawn(this.ffmpegPath, this.mirrorArgs, { stdio: ['pipe', 'ignore', 'pipe'] });
+    this.mirror = mirror;
+    mirror.stderr?.on('data', (chunk) => process.stderr.write(this.filterLog(chunk)));
+    mirror.stdin.on('error', () => {});
+    mirror.on('error', () => {});
+    this.onMasterStart(mirror.pid);
+    mirror.on('exit', (code) => {
+      if (this.mirror !== mirror) return;
+      this.mirror = null;
+      if (!this.connected) return;
+      this.log(`[BT3 stream] seconda destinazione chiusa (${code}): nuovo tentativo tra ${Math.round(this.mirrorRetryMs / 1000)} secondi, la diretta principale continua.`);
+      this.mirrorTimer = setTimeout(() => { this.mirrorTimer = null; this.startMirror(); }, this.mirrorRetryMs);
+    });
+  }
+
+  stopMirror() {
+    clearTimeout(this.mirrorTimer);
+    this.mirrorTimer = null;
+    const mirror = this.mirror;
+    this.mirror = null;
+    if (!mirror) return;
+    mirror.stdin.end();
+    setTimeout(() => mirror.kill(), this.flushMs);
+  }
+
+  /** Copia verso la seconda destinazione senza mai aspettarla: se resta indietro si chiude. */
+  writeMirror(packets) {
+    const mirror = this.mirror;
+    if (!mirror?.stdin.writable) return;
+    if (mirror.stdin.writableLength > 16 * 1024 * 1024) { mirror.kill(); return; }
+    mirror.stdin.write(packets);
   }
 
   /** Copia una sorgente nel principale finché resta quella attiva. */
@@ -104,6 +147,7 @@ export class ContinuousOutput {
       if (this.activeSource !== source) return;
       const packets = align(chunk);
       if (!packets.length || !this.master?.stdin.writable) return;
+      this.writeMirror(packets);
       if (!this.master.stdin.write(packets)) {
         source.stdout.pause();
         this.master.stdin.once('drain', () => source.stdout.resume());
@@ -163,6 +207,7 @@ export class ContinuousOutput {
   /** Chiude davvero la diretta. Il principale finisce di codificare ciò che ha ricevuto. */
   async stop() {
     this.stopFiller();
+    this.stopMirror();
     if (!this.connected) return this.done;
     this.master.stdin.end();
     const master = this.master;

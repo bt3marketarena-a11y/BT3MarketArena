@@ -11,14 +11,44 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BACKGROUND_FLAGS, findChromeExecutable } from '../launcher.mjs';
 import { ContinuousOutput } from './streamOutput.mjs';
+import { startWhipProxy } from './whipProxy.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_GAME_URL = 'https://bt-3-market-arena.vercel.app/runtime.html?hud=0&embedded=0&lang=it&env=BT3_SCALE%3D1%2CBT3_INTERP%3D0';
 const STANDBY_IMAGE = path.join(ROOT, 'templates', 'assets', 'cover.png');
 
 /** Toglie qualsiasi URL di destinazione: contiene la stream key. */
-export function redactStreamUrls(text) {
-  return String(text).replace(/rtmps?:\/\/\S+/gi, '[destinazione nascosta]');
+export function redactStreamUrls(text, secrets = []) {
+  // Gli URL di gioco e bundle restano leggibili nei log: si nascondono solo le destinazioni.
+  let clean = String(text).replace(/rtmps?:\/\/\S+|https?:\/\/\S*(?:whip|livekit)\S*/gi, '[destinazione nascosta]');
+  for (const secret of secrets) if (secret) clean = clean.split(secret).join('[nascosto]');
+  return clean;
+}
+
+/** Uscita WHIP (WebRTC, es. pump.fun su LiveKit): 720p30 senza B-frame e audio Opus. */
+export function buildWhipArgs({ url, token = '', encoder = 'libx264', videoBitrate = '2500k' } = {}) {
+  // https verso il server, oppure l'intermediario locale (whipProxy.mjs) su 127.0.0.1.
+  if (!/^(https:\/\/|http:\/\/127\.0\.0\.1:\d+\/)/i.test(String(url ?? ''))) throw new Error('STREAM_WHIP_URL deve iniziare con https://');
+  const kbps = Number.parseInt(videoBitrate, 10);
+  return [
+    '-hide_banner', '-loglevel', 'warning',
+    ...(encoder === 'h264_nvenc' ? ['-hwaccel', 'cuda'] : []),
+    '-fflags', '+genpts+discardcorrupt', '-f', 'mpegts', '-i', 'pipe:0',
+    '-map', '0:v:0', '-map', '0:a:0?',
+    '-vf', 'scale=1280:720:flags=bicubic,fps=30',
+    '-af', 'aresample=async=1000',
+    ...({
+      h264_nvenc: ['-c:v', 'h264_nvenc', '-preset', 'p4', '-tune', 'll', '-rc', 'cbr', '-profile:v', 'baseline'],
+      h264_qsv: ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-look_ahead', '0', '-profile:v', 'baseline'],
+    }[encoder] ?? ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency', '-profile:v', 'baseline']),
+    '-bf', '0', '-pix_fmt', 'yuv420p',
+    '-b:v', videoBitrate, '-maxrate', videoBitrate, '-bufsize', `${kbps * 2}k`, '-g', '60',
+    '-c:a', 'libopus', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+    // Con il buffer UDP predefinito Windows blocca l'invio e il muxer WHIP si chiude.
+    '-ts_buffer_size', '8388608',
+    ...(token ? ['-authorization', token] : []),
+    '-f', 'whip', url,
+  ];
 }
 
 // Copia su file i messaggi della console: senza, a diretta chiusa non resta nessuna prova
@@ -228,6 +258,7 @@ async function readDiagnostics(page) {
 export function createOutput(env = process.env) {
   const ffmpegPath = findFfmpeg(env);
   const encoder = pickEncoder(ffmpegPath, env.STREAM_VIDEO_ENCODER);
+  const secrets = [env.STREAM_WHIP_TOKEN];
   const output = new ContinuousOutput({
     ffmpegPath,
     fillerImage: STANDBY_IMAGE,
@@ -238,10 +269,18 @@ export function createOutput(env = process.env) {
       videoBitrate: env.STREAM_VIDEO_BITRATE || '6000k',
       encoder,
     }),
-    filterLog: redactStreamUrls,
+    filterLog: (text) => redactStreamUrls(text, secrets),
     onMasterStart: (pid) => lowerPriority(pid, env),
   });
-  console.log(`[BT3 stream] encoder video: ${encoder}`);
+  console.log(`[BT3 stream] encoder video: ${encoder}${env.STREAM_WHIP_URL ? ' + seconda destinazione WHIP (720p30)' : ''}`);
+  if (env.STREAM_WHIP_URL) {
+    if (!/^https:\/\//i.test(env.STREAM_WHIP_URL)) throw new Error('STREAM_WHIP_URL deve iniziare con https://');
+    // FFmpeg prova solo il primo candidato ICE: l'intermediario locale toglie quelli IPv6.
+    startWhipProxy({ target: env.STREAM_WHIP_URL }).then((proxy) => {
+      output.mirrorArgs = buildWhipArgs({ url: proxy.url, token: env.STREAM_WHIP_TOKEN, encoder });
+      output.startMirror();
+    }).catch((error) => console.error(`[BT3 stream] seconda destinazione non avviata: ${redactStreamUrls(error.message, secrets)}`));
+  }
   return output;
 }
 

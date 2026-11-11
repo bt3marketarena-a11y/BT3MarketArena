@@ -17,15 +17,16 @@ try {
 if (-not $key.Trim()) { throw 'Nessuna stream key inserita.' }
 $env:STREAM_RTMP_URL = "$($IngestUrl.TrimEnd('/'))/$($key.Trim())"
 Remove-Variable key, secure
-Remove-Item Env:\STREAM_RTMP_URL_SECONDARY -ErrorAction SilentlyContinue
+Remove-Item Env:\STREAM_RTMP_URL_SECONDARY, Env:\STREAM_WHIP_URL, Env:\STREAM_WHIP_TOKEN -ErrorAction SilentlyContinue
 
-# Seconda destinazione facoltativa (es. pump.fun in modalità RTMP/OBS): stesso video del
-# gioco, senza webcam. Se cade, Kick continua (tee con onfail=ignore).
+# Seconda destinazione facoltativa (pump.fun): stesso video del gioco, senza webcam.
+# pump.fun usa WHIP (https://...whip.livekit.cloud/...): un FFmpeg separato, se cade Kick continua.
+# Un server rtmp:// passa invece dal tee del principale (onfail=ignore).
 Write-Host ''
-Write-Host 'Trasmettere anche su pump.fun? Incolla il Server URL RTMP di pump.fun, oppure premi Invio per saltare.'
+Write-Host 'Trasmettere anche su pump.fun? Incolla il Server URL di pump.fun, oppure premi Invio per saltare.'
 $server = (Read-Host 'Server URL pump.fun').Trim()
 if ($server) {
-  if ($server -notmatch '^rtmps?://') { throw 'Il Server URL deve iniziare con rtmp:// o rtmps://' }
+  if ($server -notmatch '^(rtmps?|https)://') { throw 'Il Server URL deve iniziare con https://, rtmp:// o rtmps://' }
   $securePump = Read-Host -AsSecureString 'Stream key pump.fun'
   $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePump)
   try {
@@ -34,7 +35,12 @@ if ($server) {
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
   }
   if (-not $pumpKey.Trim()) { throw 'Nessuna stream key pump.fun inserita.' }
-  $env:STREAM_RTMP_URL_SECONDARY = "$($server.TrimEnd('/'))/$($pumpKey.Trim())"
+  if ($server -match '^https://') {
+    $env:STREAM_WHIP_URL = $server
+    $env:STREAM_WHIP_TOKEN = $pumpKey.Trim()
+  } else {
+    $env:STREAM_RTMP_URL_SECONDARY = "$($server.TrimEnd('/'))/$($pumpKey.Trim())"
+  }
   Remove-Variable pumpKey, securePump
   Write-Host 'Doppia diretta attiva: Kick + pump.fun.' -ForegroundColor Green
 }
